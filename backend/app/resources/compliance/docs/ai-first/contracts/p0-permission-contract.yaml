@@ -1,0 +1,176 @@
+schema_version: 1
+status: "frozen"
+updated_at: "2026-05-19"
+
+contract_id: "P0-BACKEND-PERMISSION"
+freeze_gate: "BACKEND-FREEZE-001"
+frozen: true
+frozen_at: "2026-05-19"
+freeze_decision: "BACKEND-FREEZE-001 approved after second-round frontend audit"
+
+auth_strategy:
+  identity_provider: "Casdoor"
+  token: "JWT"
+  authorization_engine: "Casbin"
+  adapter_rule: "Business APIs must depend on an auth/permission adapter, not directly on Casdoor/Casbin implementation details."
+  frontend_menu_rule: "permittedMenuIds are UI rendering hints only; backend authorization must be server-owned."
+
+principal_levels:
+  - "BRANCH_OFFICE"
+  - "BRANCH_COMPANY"
+  - "LINE_HEADQUARTERS"
+  - "COMPLIANCE_DEPARTMENT"
+  - "COMPLIANCE_DIRECTOR"
+
+roles:
+  - id: "ROLE_SYSTEM_ADMIN"
+    maps_to_levels: ["COMPLIANCE_DEPARTMENT"]
+    p0: true
+  - id: "ROLE_COMPLIANCE_DIRECTOR"
+    maps_to_levels: ["COMPLIANCE_DIRECTOR"]
+    p0: true
+  - id: "ROLE_COMPLIANCE_MANAGER"
+    maps_to_levels: ["COMPLIANCE_DEPARTMENT"]
+    p0: true
+  - id: "ROLE_INSPECTION_LEAD"
+    maps_to_levels: ["COMPLIANCE_DEPARTMENT"]
+    p0: true
+  - id: "ROLE_INSPECTOR"
+    maps_to_levels: ["COMPLIANCE_DEPARTMENT"]
+    p0: true
+  - id: "ROLE_BRANCH_MANAGER"
+    maps_to_levels: ["BRANCH_COMPANY"]
+    p0: true
+  - id: "ROLE_BRANCH_COMPLIANCE_OFFICER"
+    maps_to_levels: ["BRANCH_OFFICE", "BRANCH_COMPANY"]
+    p0: true
+  - id: "ROLE_BUSINESS_LINE_MANAGER"
+    maps_to_levels: ["LINE_HEADQUARTERS"]
+    p0: false
+    reason: "P1 guardrail for multi-level review; keep model extensible."
+
+data_scopes:
+  - id: "all"
+    meaning: "All tenant/company data."
+  - id: "organization"
+    meaning: "Current organization plus configured child organizations."
+  - id: "project"
+    meaning: "Records inside an assigned inspection plan/project."
+  - id: "own"
+    meaning: "Records created by or assigned to current user."
+
+resources:
+  - id: "AUTH_SESSION"
+    entity: "AuthUser"
+  - id: "MENU"
+    entity: "AppMenuItem"
+  - id: "ORG_PERMISSION"
+    entity: "OrgNode/SystemRole/RoleAssignment"
+  - id: "TASK"
+    entity: "UnifiedTask"
+  - id: "INSPECTION_PLAN"
+    entity: "InspectionPlan"
+  - id: "INSPECTION_EVIDENCE"
+    entity: "EvidenceRequirement/EvidenceSubmission/FileAsset"
+  - id: "INSPECTION_APPEAL"
+    entity: "IssueAppeal/AdjudicationDecision"
+  - id: "COMPLIANCE_ISSUE"
+    entity: "ComplianceIssue"
+  - id: "RECTIFICATION"
+    entity: "RectificationRecord"
+
+permissions:
+  - id: "PERM-AUTH-LOGIN"
+    roles: ["anonymous"]
+    resource: "AUTH_SESSION"
+    actions: ["login"]
+    data_scope: "own"
+
+  - id: "PERM-SYSTEM-ADMIN"
+    roles: ["ROLE_SYSTEM_ADMIN"]
+    resource: "ORG_PERMISSION"
+    actions: ["read_org", "read_personnel", "read_roles", "assign_role", "remove_role"]
+    data_scope: "all"
+
+  - id: "PERM-TASK-HQ"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR", "ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD", "ROLE_INSPECTOR"]
+    resource: "TASK"
+    actions: ["list", "resolve_target"]
+    data_scope: "project"
+    restrictions:
+      - "resolve_target must not change task status"
+
+  - id: "PERM-TASK-BRANCH"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "TASK"
+    actions: ["list", "resolve_target"]
+    data_scope: "organization"
+    restrictions:
+      - "task target must belong to current organization scope"
+
+  - id: "PERM-HQ-INSPECTION-MANAGE"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR", "ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD", "ROLE_INSPECTOR"]
+    resource: "INSPECTION_PLAN"
+    actions: ["create", "read", "update", "save_draft", "submit_approval", "approve", "launch", "suspend", "resume", "terminate", "complete", "monitor", "send_reminder"]
+    data_scope: "all"
+    restrictions:
+      - "Lifecycle transition actions must pass the InspectionPlan state machine guard."
+      - "terminate requires a non-empty reason."
+
+  - id: "PERM-BRANCH-INSPECTION-HANDLE"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "INSPECTION_EVIDENCE"
+    actions: ["read_requirement", "upload_file", "submit_evidence", "confirm_fact", "submit_appeal"]
+    data_scope: "organization"
+    restrictions:
+      - "Can only submit evidence for targeted branch/org."
+      - "Can only appeal issues assigned to current org."
+
+  - id: "PERM-HQ-ADJUDICATION"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR", "ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD"]
+    resource: "INSPECTION_APPEAL"
+    actions: ["list", "read", "adopt", "reject"]
+    data_scope: "project"
+    restrictions:
+      - "decisionReason is required for adopt/reject."
+
+  - id: "PERM-ISSUE-HQ"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR", "ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD"]
+    resource: "COMPLIANCE_ISSUE"
+    actions: ["query", "read", "supervise", "verify_rectification", "reject_rectification"]
+    data_scope: "all"
+
+  - id: "PERM-ISSUE-BRANCH"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "RECTIFICATION"
+    actions: ["query", "read", "submit_feedback", "request_extension"]
+    data_scope: "organization"
+    restrictions:
+      - "Can only submit feedback for responsible organization."
+
+menu_mapping:
+  full_hq:
+    roles: ["ROLE_SYSTEM_ADMIN", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD", "ROLE_INSPECTOR"]
+    permitted_menu_ids: ["hq-dashboard", "hq-branch-profile", "hq-tasks", "hq-plans", "hq-monitor", "hq-adjudication-console", "hq-issue-hub", "hq-org", "hq-dictionaries"]
+  branch_only:
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    permitted_menu_ids: ["branch-tasks", "branch-upload", "branch-confirmation", "branch-ledger"]
+  hybrid_review:
+    roles: ["ROLE_BRANCH_COMPLIANCE_OFFICER", "ROLE_BUSINESS_LINE_MANAGER"]
+    permitted_menu_ids: ["branch-tasks", "branch-upload", "branch-confirmation", "branch-ledger", "hq-review"]
+
+denied_response:
+  http_status: 403
+  code: "FORBIDDEN"
+  message: "无权执行此操作"
+
+open_items:
+  - id: "ROLE-CODE-ALIGNMENT-001"
+    status: "implementation_constraint"
+    description: "Confirm final mapping between frontend levels, seed ROLE_* values, and Casbin policy subjects."
+  - id: "AUDIT-P0-PERMISSION-PLAN-LIFECYCLE"
+    status: "contract_updated"
+    description: "Added save/update and lifecycle transition actions for InspectionPlanHeader suspend/resume/terminate behavior."
+  - id: "AUDIT-P0-PERMISSION-APPEAL-LIST"
+    status: "contract_updated"
+    description: "Added explicit list action for HQ adjudication appeal queue."

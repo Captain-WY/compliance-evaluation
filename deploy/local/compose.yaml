@@ -1,0 +1,151 @@
+name: compliance-evaluation-dev
+
+x-backend: &backend
+  image: compliance-evaluation-backend:dev
+  build:
+    context: ../..
+    dockerfile: deploy/local/backend.Dockerfile
+    args:
+      PYTHON_IMAGE: ${PYTHON_IMAGE:-public.ecr.aws/docker/library/python:3.12-slim}
+  env_file: .env
+  environment:
+    COMMON_DATABASE_URL: postgresql+asyncpg://common_app:${COMMON_DB_PASSWORD}@postgres:5432/platform_common
+    CASE_DATABASE_URL: postgresql+asyncpg://case_app:${CASE_DB_PASSWORD}@postgres:5432/case_business
+    COMPLIANCE_DATABASE_URL: postgresql+asyncpg://compliance_app:${COMPLIANCE_DB_PASSWORD}@postgres:5432/compliance_business
+    CASDOOR_ENDPOINT: http://casdoor:8000
+    REDIS_URL: redis://redis:6379/0
+    MINIO_ENDPOINT: minio:9000
+  networks: [app]
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      COMMON_DB_PASSWORD: ${COMMON_DB_PASSWORD}
+      CASE_DB_PASSWORD: ${CASE_DB_PASSWORD}
+      COMPLIANCE_DB_PASSWORD: ${COMPLIANCE_DB_PASSWORD}
+      CASDOOR_DB_PASSWORD: ${CASDOOR_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-app-databases.sh:ro
+    networks: [app]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis-data:/data]
+    networks: [app]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports: ['127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001', '127.0.0.1:${MINIO_API_PORT:-9000}:9000']
+    volumes: [minio-data:/data]
+    networks: [app]
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9000/minio/health/live]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  minio-init:
+    image: minio/mc:RELEASE.2024-06-12T14-34-03Z
+    profiles: [init]
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-compliance-files}
+    entrypoint: [/bin/sh, -ec]
+    command: ['mc alias set local http://minio:9000 "$${MINIO_ACCESS_KEY}" "$${MINIO_SECRET_KEY}" >/dev/null; mc mb --ignore-existing "local/$${MINIO_BUCKET}"']
+    networks: [app]
+  casdoor:
+    image: ${CASDOOR_IMAGE:-registry.hub.docker.com/casbin/casdoor@sha256:758bb52a59dc4bf47c38956230353a213ac485c34f672e020daf2deca1e98e63}
+    environment:
+      driverName: postgres
+      dataSourceName: 'user=casdoor_app password=${CASDOOR_DB_PASSWORD} host=postgres port=5432 sslmode=disable dbname=casdoor'
+      dbName: casdoor
+      origin: ${CASDOOR_PUBLIC_ENDPOINT}
+      originFrontend: ${CASDOOR_PUBLIC_ENDPOINT}
+      initDataFile: /conf/init_data.json
+      initDataNewOnly: 'true'
+    volumes:
+      - ./casdoor/app.conf:/conf/app.conf:ro
+      - ../../.local/casdoor-init.json:/conf/init_data.json:ro
+    ports: ['127.0.0.1:${CASDOOR_PORT:-8000}:8000']
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [app]
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8000/.well-known/openid-configuration]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+  migrate:
+    <<: *backend
+    profiles: [init]
+    command: [sh, -ec, 'alembic -n common upgrade head && alembic -n cases upgrade head && alembic -n compliance upgrade head && python -m app.seed']
+  backend:
+    <<: *backend
+    ports: ['127.0.0.1:${BACKEND_PORT:-8010}:8000']
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      casdoor: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ready', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  frontend:
+    image: compliance-evaluation-frontend:dev
+    build:
+      context: ../..
+      dockerfile: deploy/local/frontend.Dockerfile
+      args:
+        NGINX_IMAGE: ${NGINX_IMAGE:-public.ecr.aws/docker/library/nginx:1.28-alpine}
+    ports: ['127.0.0.1:${FRONTEND_PORT:-3010}:80']
+    depends_on:
+      backend: {condition: service_healthy}
+    networks: [app]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/healthz]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
+    profiles: [search]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes: [search-data:/usr/share/elasticsearch/data]
+    networks: [app]
+
+networks:
+  app: {}
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  minio-data: {}
+  search-data: {}

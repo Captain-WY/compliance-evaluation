@@ -1,0 +1,277 @@
+schema_version: 1
+artifact_id: "SPEC-P2-PERMISSION-TEST-CANDIDATE"
+status: "frozen_after_human_gate"
+generated_at: "2026-05-26T10:00:00+08:00"
+baseline_commit: "f450558"
+work_packet: "WP-P2-00"
+
+auth_alignment:
+  identity_provider_target: "Casdoor"
+  authorization_engine_target: "Casbin"
+  adapter_rule: "Business APIs depend on the existing auth/permission adapter, not Casdoor/Casbin internals."
+  menu_rule: "permittedMenuIds remain UI hints; backend permission checks are server-owned."
+  implementation_allowed_before_freeze: false
+
+permission_id_policy:
+  canonical_rule: "Frozen P2 permission IDs must use the PERM-P2-* values in candidate_permissions."
+  routing_contract_rule: "p2-routing-contract.yaml permission_candidates must reference canonical PERM-P2-* IDs."
+  alias_rule: "Short names are documentation/search aliases only and must be normalized before implementation."
+  short_aliases:
+    notification:read-own: "PERM-P2-NOTIFICATION-READ-OWN"
+    notification:mark-read: "PERM-P2-NOTIFICATION-MARK-READ"
+    issue:project-tracker:read: "PERM-P2-ISSUE-PROJECT-TRACKER-READ"
+    issue:project-tracker:remind: "PERM-P2-ISSUE-PROJECT-TRACKER-REMIND"
+    issue:analytics:read: "PERM-P2-ISSUE-ANALYTICS-READ"
+    issue:analytics:export: "PERM-P2-ISSUE-ANALYTICS-EXPORT"
+    assessment:review-workbench:read: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-READ"
+    assessment:review-workbench:decide: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-DECIDE"
+    assessment:review-workbench:batch-decide: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-BATCH-DECIDE"
+    workflow:template:read: "PERM-P2-WORKFLOW-TEMPLATE-READ"
+    workflow:template:manage: "PERM-P2-WORKFLOW-TEMPLATE-MANAGE"
+    workflow:route-preview:read: "PERM-P2-WORKFLOW-TEMPLATE-READ"
+    assessment:schedule:read: "PERM-P2-ASSESSMENT-SCHEDULE-READ"
+    assessment:schedule:manage: "PERM-P2-ASSESSMENT-SCHEDULE-MANAGE"
+    assessment:schedule:retry: "PERM-P2-ASSESSMENT-SCHEDULE-RETRY"
+    assessment:simulation:read: "PERM-P2-ASSESSMENT-SIMULATION-READ"
+    assessment:simulation:run: "PERM-P2-ASSESSMENT-SIMULATION-RUN"
+    assessment:data-source:read: "PERM-P2-DATA-COCKPIT-READ"
+    assessment:data-sync:operate: "PERM-P2-DATA-COCKPIT-OPERATE"
+    assessment:data-sync:export: "PERM-P2-DATA-COCKPIT-EXPORT"
+
+personas:
+  - id: "persona_all_authenticated_user"
+    data_scope: "own_user"
+    p2_access:
+      - "notification read own recipient state"
+      - "task count for own task scope"
+  - id: "persona_hq_compliance_manager"
+    roles: ["ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "all"
+    p2_access:
+      - "issue project tracker"
+      - "issue analytics/export"
+      - "workflow designer candidate"
+      - "assessment scheduler/simulation/data cockpit candidate"
+      - "unified review workbench if assigned or all-scope is approved"
+  - id: "persona_compliance_director"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+    p2_access:
+      - "final review/workflow approval policy candidate"
+      - "analytics/export"
+  - id: "persona_hq_reviewer"
+    roles: ["ROLE_INSPECTION_LEAD", "ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "assigned_or_project"
+    p2_access:
+      - "unified review workbench assigned tasks"
+      - "task/notification read"
+  - id: "persona_branch_actor"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    data_scope: "organization"
+    p2_access:
+      - "own notifications"
+      - "own branch task counts"
+      - "no HQ issue analytics/export unless separately approved"
+
+candidate_permissions:
+  - id: "PERM-P2-NOTIFICATION-READ-OWN"
+    resource: "NOTIFICATION"
+    actions: ["list_own", "read_own", "unread_count"]
+    roles: ["any_authenticated_user"]
+    data_scope: "own_user"
+  - id: "PERM-P2-NOTIFICATION-MARK-READ"
+    resource: "NOTIFICATION"
+    actions: ["mark_own_read", "mark_all_own_read"]
+    roles: ["any_authenticated_user"]
+    data_scope: "own_user"
+  - id: "PERM-P2-ISSUE-PROJECT-TRACKER-READ"
+    resource: "ISSUE_PROJECT_TRACKER"
+    actions: ["list", "read", "drilldown"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    data_scope: "all_or_assigned_project"
+  - id: "PERM-P2-ISSUE-PROJECT-TRACKER-REMIND"
+    resource: "ISSUE_PROJECT_TRACKER"
+    actions: ["send_overdue_reminder"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-ISSUE-ANALYTICS-READ"
+    resource: "ISSUE_ANALYTICS"
+    actions: ["read"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    data_scope: "all_or_assigned_project"
+  - id: "PERM-P2-ISSUE-ANALYTICS-EXPORT"
+    resource: "ISSUE_ANALYTICS"
+    actions: ["export"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-READ"
+    resource: "UNIFIED_REVIEW_WORKBENCH"
+    actions: ["list", "read"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    data_scope: "assigned_or_project"
+  - id: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-DECIDE"
+    resource: "UNIFIED_REVIEW_WORKBENCH"
+    actions: ["start", "save_comment", "approve", "reject", "return"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD"]
+    data_scope: "assigned_or_project"
+    decision_result: "P2-REVIEW-LAYERS-001=B"
+    route_engine_policy: "P2-WORKFLOW-OSS-001 accepted local RouteChainEvaluator."
+  - id: "PERM-P2-UNIFIED-REVIEW-WORKBENCH-BATCH-DECIDE"
+    resource: "UNIFIED_REVIEW_WORKBENCH"
+    actions: ["batch_approve", "batch_reject"]
+    roles: ["ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "assigned_or_project"
+    decision_result: "P2-REVIEW-LAYERS-001=B"
+    route_engine_policy: "P2-WORKFLOW-OSS-001 accepted local RouteChainEvaluator."
+  - id: "PERM-P2-WORKFLOW-TEMPLATE-READ"
+    resource: "WORKFLOW_TEMPLATE"
+    actions: ["list", "read", "preview"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-WORKFLOW-TEMPLATE-MANAGE"
+    resource: "WORKFLOW_TEMPLATE"
+    actions: ["create", "update_draft", "validate", "publish", "archive"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+    decision_result: "P2-WORKFLOW-SCOPE-001=A"
+    route_engine_policy: "P2-WORKFLOW-OSS-001 accepted local route-template model; no external workflow runtime."
+  - id: "PERM-P2-ASSESSMENT-SCHEDULE-READ"
+    resource: "ASSESSMENT_SCHEDULE"
+    actions: ["read", "list_executions"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-ASSESSMENT-SCHEDULE-MANAGE"
+    resource: "ASSESSMENT_SCHEDULE"
+    actions: ["save_draft", "activate", "pause", "resume", "archive"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-ASSESSMENT-SCHEDULE-RETRY"
+    resource: "ASSESSMENT_SCHEDULE_EXECUTION"
+    actions: ["retry_failed_execution"]
+    roles: ["ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "all"
+  - id: "PERM-P2-ASSESSMENT-SIMULATION-READ"
+    resource: "ASSESSMENT_SIMULATION"
+    actions: ["read"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-ASSESSMENT-SIMULATION-RUN"
+    resource: "ASSESSMENT_SIMULATION"
+    actions: ["run", "cancel"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "PERM-P2-DATA-COCKPIT-READ"
+    resource: "ASSESSMENT_DATA_SYNC"
+    actions: ["read_health", "read_jobs", "read_snapshot"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+    decision_result: "P2-DATA-EXTERNAL-001=A"
+  - id: "PERM-P2-DATA-COCKPIT-OPERATE"
+    resource: "ASSESSMENT_DATA_SYNC"
+    actions: ["retry", "ignore_alert", "overwrite_rerun"]
+    roles: ["ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "all"
+    decision_result: "P2-DATA-EXTERNAL-001=A"
+  - id: "PERM-P2-DATA-COCKPIT-EXPORT"
+    resource: "ASSESSMENT_DATA_SYNC"
+    actions: ["export_audit_evidence"]
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+
+denial_requirements:
+  - "A branch actor cannot read HQ issue analytics/export surfaces unless a future explicit branch view is frozen."
+  - "Notification APIs can only mutate the current actor's recipient state."
+  - "Review workbench decisions require assigned_or_project scope even if menu access is visible."
+  - "Data sync overwrite rerun requires a high-risk audit event and cannot be exposed to branch actors."
+  - "Server export endpoints must not leak Authorization headers, credentials, or source payload secrets in artifacts. First-batch Issue Analytics client export has no server artifact after P2-EXPORT-001=B."
+
+acceptance_scenarios:
+  - id: "AC-P2-NOTIF-001"
+    slice: "P2-NOTIF-05"
+    name: "Notification center uses durable per-recipient read state"
+    assertions:
+      - "Authenticated user lists only notifications addressed to them or their role/scope."
+      - "Unread count decreases after mark-read and mark-all-read."
+      - "Mark-read creates audit/read receipt and does not mark any UnifiedTask done."
+      - "Notification center route is either authorized and reachable or visibly disabled by design."
+  - id: "AC-P2-TASK-COUNT-001"
+    slice: "P2-NOTIF-05"
+    name: "Task counts reflect real task mutations without mock fallback"
+    assertions:
+      - "Counts are computed from real UnifiedTask rows and actor scope."
+      - "Creating P0/P1/P2 task-generating events changes count after refetch."
+      - "Read/open navigation does not change done/open counts."
+  - id: "AC-P2-ISSUE-PROJECT-001"
+    slice: "P2-ISSUE-06"
+    name: "Issue project tracker is a scoped read model with reminder command"
+    assertions:
+      - "Project and branch progress totals match underlying issues/rectifications."
+      - "Filters change backend query results and pagination metadata."
+      - "Overdue reminder records a reminder event and uses notification/task delivery semantics after P2-NOTIF-05."
+      - "Drilldown carries project/org/status filters to issue ledger."
+  - id: "AC-P2-ISSUE-EXPORT-001"
+    slice: "P2-ISSUE-06"
+    name: "Issue analytics export remains a scoped client convenience export"
+    assertions:
+      - "Analytics read model is read-only."
+      - "P2-EXPORT-001=B: browser-side PNG/download uses already-authorized analytics data and does not create ExportArtifact or ExportAuditEvent."
+      - "Export button visibility still requires `PERM-P2-ISSUE-ANALYTICS-EXPORT`; branch actors without permission cannot trigger the client export UI."
+  - id: "AC-P2-REVIEW-001"
+    slice: "P2-REVIEW-07"
+    name: "Unified review workbench respects assignment, levels, batch actions, and audit trail"
+    assertions:
+      - "Reviewer sees only assigned/project-scoped review tasks."
+      - "Approve/reject/return decisions use L0/L1/L2/L3 level semantics restored by P2-REVIEW-LAYERS-001=B, with decision reason where applicable."
+      - "Batch decisions apply atomically per eligible task and report per-task failures."
+      - "Audit trail records actor, from/to level, decision, and comment."
+  - id: "AC-P2-WORKFLOW-001"
+    slice: "P2-WORKFLOW-01"
+    name: "Workflow designer validates and publishes route templates"
+    assertions:
+      - "Draft template can define target scope, route chains, role/user approver selectors, and global final approver."
+      - "Validation rejects unresolved roles/users, empty approver sets, disconnected chains, loops, missing final approver, target-scope ambiguity, and invalid typed conditions."
+      - "Published template version is immutable and used by later scheduler/review tasks by snapshot."
+      - "Route templates enforce segregation of duties so an L0 submitter cannot approve later levels for the same source record unless a future explicit override policy is approved."
+  - id: "AC-P2-SCHED-001"
+    slice: "P2-SCHED-02"
+    name: "Assessment scheduler creates auditable scheduled dispatch executions"
+    assertions:
+      - "Schedule activation requires an active scheme and valid schedule rule."
+      - "Predicted next fire time uses server-side calendar/timezone logic."
+      - "Failed execution retry is idempotent or duplicate-protected."
+      - "Scheduled dispatch reuses P1 dispatch guards."
+  - id: "AC-P2-SIM-001"
+    slice: "P2-SIM-03"
+    name: "Simulation runs are non-mutating historical backtests"
+    assertions:
+      - "Simulation creates a run snapshot and never mutates official AssessmentResult."
+      - "Missing historical data imputation is explicit in the result."
+      - "Results can be refetched by simulationId with authorization."
+  - id: "AC-P2-DATA-001"
+    slice: "P2-DATA-04"
+    name: "External data cockpit handles source health, retry, ignore, overwrite rerun, and audit export safely"
+    assertions:
+      - "Source health and sync job ledger are backed by real connector/job records or an approved sandbox adapter."
+      - "Retry and overwrite rerun create audit events and enforce idempotency/duplicate controls."
+      - "Ignore alert changes alert state without deleting failure evidence."
+      - "Snapshot view redacts sensitive payload fields and references immutable evidence."
+  - id: "AC-P2-PERMISSION-001"
+    slice: "all"
+    name: "P2 data-scope and permission denial"
+    assertions:
+      - "Branch actor cannot access HQ-only P2 issue analytics, workflow, scheduler, simulation, or data cockpit APIs."
+      - "Out-of-scope review and notification records return 403 or 404 according to existing P0/P1 policy."
+      - "Frontend menu/header visibility is never accepted as backend authorization."
+
+quality_gates:
+  contract_freeze:
+    - "YAML parse for all P2 specs/contracts."
+    - "T6 independent audit of P2 freeze candidate."
+    - "T7 challenging review of hidden/orphan promotion, export semantics, workflow scope, and external data risk."
+    - "Human decision P2-FREEZE-001 accepted before implementation."
+    - "P2-WORKFLOW-OSS-001 accepted; P2-WORKFLOW-01/P2-REVIEW-07 must follow the lightweight route-template implementation guide."
+  per_implementation_packet:
+    - "verification report"
+    - "backend tests for API/state/permission"
+    - "frontend real-mode no silent fallback proof where UI is touched"
+    - "expect-first browser evidence before Playwright promotion"

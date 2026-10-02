@@ -1,0 +1,301 @@
+schema_version: 1
+status: "frozen"
+updated_at: "2026-06-06"
+
+contract_id: "P0-BACKEND-ENTITY-MODEL"
+freeze_gate: "BACKEND-FREEZE-001"
+frozen: true
+frozen_at: "2026-05-19"
+freeze_decision: "BACKEND-FREEZE-001 approved after second-round frontend audit"
+
+model_principles:
+  - "Use stable IDs and never rely on display labels as identifiers."
+  - "Frontend MVP uses generic `id` and display labels frequently; backend contract uses domain-prefixed IDs and must provide explicit DTO/view mapping."
+  - "Keep UnifiedTask and FileAsset module-neutral for P1/P2 expansion."
+  - "Support multi-level review: branch office, branch company, line headquarters, compliance department, compliance director."
+  - "Do not model dashboard metrics as durable write entities in P0."
+  - "Keep issue and rectification status values unified."
+
+entities:
+  - id: "AuthUser"
+    priority: "P0"
+    purpose: "Authenticated subject and UI menu payload."
+    key_fields: ["userId", "id", "username", "displayName", "title", "department", "organizationName", "orgId", "level", "menuMode", "permittedMenuIds", "roleIds", "defaultMenuId", "taskView", "avatarLabel"]
+    relationships:
+      - "belongs_to OrgNode via orgId"
+      - "has many SystemRole via roleIds"
+    notes:
+      - "permittedMenuIds are UI cache only; backend permission source remains Casbin policy."
+      - "`id` is a frontend compatibility alias for canonical `userId`."
+      - "Frontend currently displays organizationName/department and does not provide orgId/roleIds; backend must enrich these fields in AuthUser responses."
+
+  - id: "OrgNode"
+    priority: "P0"
+    purpose: "Organization tree and data-scope boundary."
+    key_fields: ["orgId", "orgName", "orgLevel", "parentOrgId", "region", "city", "businessLineIds", "dataOrigin"]
+    relationships:
+      - "parent/child OrgNode"
+      - "has many Personnel"
+    enum_refs: ["org_levels", "business_lines"]
+    notes:
+      - "Must support non-strict workflow review chains beyond pure administrative tree."
+
+  - id: "Personnel"
+    priority: "P0"
+    purpose: "Assignable staff member for roles and workflow actors."
+    key_fields: ["personnelId", "userId", "displayName", "orgId", "title", "active"]
+    relationships:
+      - "belongs_to OrgNode"
+      - "may map to AuthUser"
+
+  - id: "SystemRole"
+    priority: "P0"
+    purpose: "Business role exposed in permission matrix and mapped to Casbin subjects/policies."
+    key_fields: ["roleId", "roleCode", "roleName", "roleLevel", "description"]
+    relationships:
+      - "has many RoleAssignment"
+
+  - id: "RoleAssignment"
+    priority: "P0"
+    purpose: "Assignment of role to personnel under organization scope."
+    key_fields: ["assignmentId", "roleId", "personnelId", "orgId", "assignedBy", "assignedAt", "active"]
+    relationships:
+      - "belongs_to SystemRole"
+      - "belongs_to Personnel"
+      - "belongs_to OrgNode"
+    audit_required: true
+
+  - id: "UnifiedTask"
+    priority: "P0"
+    purpose: "Cross-module task-center item."
+    key_fields: ["taskId", "category", "actionType", "title", "description", "priority", "dueDate", "status", "sourceId", "actionTarget", "createdAt"]
+    relationships:
+      - "sourceId references module-specific record"
+      - "has one UnifiedTaskActionTarget"
+    enum_refs: ["TaskCategory", "TaskActionType", "TaskStatus", "RiskLevel"]
+    guardrail: "Must remain module-neutral for INSPECTION, ASSESSMENT, ISSUE and future notifications."
+
+  - id: "UnifiedTaskActionTarget"
+    priority: "P0"
+    purpose: "Canonical task navigation target and backend-generated deepLink basis."
+    key_fields: ["kind", "menuId", "appPath", "publicPath", "params", "action"]
+    relationships:
+      - "embedded in UnifiedTask"
+    notes:
+      - "Resolved by GET /api/tasks/{taskId}/target."
+      - "Resolution must not mutate task status."
+
+  - id: "InspectionPlan"
+    priority: "P0"
+    purpose: "Compliance inspection plan/project."
+    key_fields: ["inspectionPlanId", "id", "inspectCode", "title", "type", "frequency", "confidentialityLevel", "confidentialityLabel", "targetOrgIds", "targetDeptLabel", "leaderUserId", "leaderName", "teamMemberUserIds", "teamMemberNames", "plannedStartDate", "plannedEndDate", "status", "phase", "currentPhase", "phaseProgress", "files", "ekpFlow"]
+    relationships:
+      - "has many EvidenceRequirement"
+      - "has many WorkingPaper"
+      - "has many InspectionIssue"
+      - "targets many OrgNode"
+      - "has many InspectionPlanAttachment read-model sub-objects bound to FileAsset"
+      - "may have many IntegrationEvent records for EKP/workflow events"
+    enum_refs: ["inspection_plan_type", "inspection_plan_frequency", "inspection_confidentiality_level", "inspection_plan_attachment_type", "inspection_status", "inspection_phase", "ekp_flow_status"]
+    state_machine: "SM-COMPLIANCE-INSPECTION-MAINLINE"
+    notes:
+      - "`id` is a frontend compatibility alias for canonical `inspectionPlanId`."
+      - "Frontend currently uses `targetDept` as a single display string; backend canonical field is `targetOrgIds`, cardinality one_or_many."
+      - "Frontend `leader` and `teamMembers` are display names; backend canonical fields are user IDs plus display-name view fields."
+      - "SIT-IPC-CONFIDENTIALITY-02 adds `confidentialityLevel` as a display-classification business field sourced from the `inspection_confidentiality_level` dictionary; create defaults to `NORMAL`, but pre-contract rows may remain null and render an empty/pending state."
+      - "SIT-IPC-ATTACHMENT-CONFIG-01 adds optional plan-scoped creation attachments in `files[]`; supported attachmentType codes are INSPECTION_NOTICE, ONSITE_INSPECTION_SCHEME, WORKING_PAPER_TEMPLATE, and OTHER."
+      - "Frontend `currentPhase` maps to canonical `phase`; response DTOs may include both during transition."
+      - "`files` and `ekpFlow` are included as frontend view sub-objects; durable EKP history remains IntegrationEvent."
+
+  - id: "InspectionPlanAttachment"
+    priority: "P0"
+    purpose: "Read-model sub-object binding a creation-stage inspection plan attachment to a FileAsset."
+    key_fields: ["attachmentType", "attachmentKey", "attachmentLabel", "required", "bindingTargetType", "businessStage", "maintenance", "fileId", "fileName", "contentType", "fileSize", "scanStatus", "uploadedBy", "uploadedAt", "boundBy", "boundAt"]
+    relationships:
+      - "embedded in InspectionPlan.files"
+      - "binds one FileAsset by fileId"
+    enum_refs: ["inspection_plan_attachment_type", "file_scan_status"]
+    notes:
+      - "All four SIT-IPC-ATTACHMENT-CONFIG-01 types are required=false."
+      - "Attachment type label/sort/active come from inspection_plan_attachment_type; backend still enforces a stable code allowlist."
+
+  - id: "EvidenceRequirement"
+    priority: "P0"
+    purpose: "Requirement for branch evidence/material submission."
+    key_fields: ["requirementId", "id", "inspectionPlanId", "inspectionId", "title", "description", "requiredTags", "dueDate", "targetOrgIds"]
+    relationships:
+      - "belongs_to InspectionPlan"
+      - "has many EvidenceSubmission"
+
+  - id: "FileAsset"
+    priority: "P0"
+    purpose: "Reusable uploaded file asset."
+    key_fields: ["fileId", "fileName", "contentType", "fileSize", "storageKey", "checksum", "uploadedBy", "uploadedAt", "scanStatus"]
+    relationships:
+      - "linked by EvidenceSubmission, IssueAppeal, RectificationFeedback"
+    guardrail: "Reusable by future assessment evidence."
+
+  - id: "EvidenceSubmission"
+    priority: "P0"
+    purpose: "Business submission binding file assets to an evidence requirement."
+    key_fields: ["evidenceSubmissionId", "id", "requirementId", "inspectionPlanId", "branchId", "branchName", "fileIds", "files", "status", "submittedBy", "submittedAt", "submitTime", "hqFeedback", "relatedIssueId"]
+    relationships:
+      - "belongs_to EvidenceRequirement"
+      - "belongs_to OrgNode via branchId"
+      - "has many FileAsset via fileIds"
+      - "may create ComplianceIssue"
+    enum_refs: ["SubmissionStatus"]
+
+  - id: "WorkingPaper"
+    priority: "P0"
+    purpose: "Inspection working paper and issue conversion source."
+    key_fields: ["workingPaperId", "id", "inspectionPlanId", "planId", "paperCode", "title", "category", "inspectorUserId", "inspector", "guidelines", "procedure", "result", "executionRecord", "fileIds", "evidenceList", "convertedIssueId", "relatedIssueId", "updateTime"]
+    relationships:
+      - "belongs_to InspectionPlan"
+      - "may create InspectionIssue/ComplianceIssue"
+
+  - id: "InspectionIssue"
+    priority: "P0"
+    purpose: "Inspection finding before or during confirmation/adjudication."
+    key_fields: ["issueId", "inspectionPlanId", "branchId", "issueCode", "title", "riskLevel", "status", "description", "basisRule", "appealDeadline"]
+    relationships:
+      - "belongs_to InspectionPlan"
+      - "belongs_to OrgNode via branchId"
+      - "may have IssueAppeal"
+      - "may create ComplianceIssue and RectificationRecord"
+
+  - id: "FactConfirmation"
+    priority: "P0"
+    purpose: "Branch no-objection confirmation for an inspection issue."
+    key_fields: ["confirmationId", "issueId", "branchId", "decision", "comment", "confirmedBy", "confirmedAt"]
+    relationships:
+      - "belongs_to InspectionIssue"
+
+  - id: "IssueAppeal"
+    priority: "P0"
+    purpose: "Branch appeal/defense case for an inspection issue."
+    key_fields: ["appealId", "issueId", "branchId", "reason", "fileIds", "status", "submittedBy", "submittedAt"]
+    relationships:
+      - "belongs_to InspectionIssue"
+      - "has one AdjudicationDecision"
+      - "has many FileAsset"
+    state_machine: "SM-INSPECTION-APPEAL"
+
+  - id: "AdjudicationDecision"
+    priority: "P0"
+    purpose: "HQ decision on appeal."
+    key_fields: ["decisionId", "appealId", "decision", "decisionReason", "decidedBy", "decidedAt"]
+    relationships:
+      - "belongs_to IssueAppeal"
+      - "updates InspectionIssue validity"
+
+  - id: "ComplianceIssue"
+    priority: "P0"
+    purpose: "Central issue hub durable issue record."
+    key_fields: ["issueId", "id", "issueCode", "title", "sourceType", "sourceId", "sourceProject", "businessLine", "responsibleOrgId", "responsibleDept", "riskLevel", "status", "discoveryDate", "slaDeadline", "description", "rectificationAdvice", "basisRule"]
+    relationships:
+      - "may originate from InspectionIssue"
+      - "has many IssueSupervisionEvent"
+      - "has one or many RectificationRecord"
+    enum_refs: ["RiskLevel", "BusinessLine", "issue_rectification_status"]
+    notes:
+      - "Frontend uses sourceProject/responsibleDept display names; backend canonical fields are sourceType/sourceId/responsibleOrgId."
+
+  - id: "IssueSupervisionEvent"
+    priority: "P0"
+    purpose: "HQ supervision/reminder event for a central issue."
+    key_fields: ["supervisionEventId", "issueId", "message", "channel", "createdBy", "createdAt", "integrationEventId"]
+    relationships:
+      - "belongs_to ComplianceIssue"
+      - "may create IntegrationEvent"
+
+  - id: "RectificationRecord"
+    priority: "P0"
+    purpose: "Rectification workflow record assigned to responsible organization."
+    key_fields: ["rectificationId", "sourceIssueId", "responsibleOrgId", "issueDescription", "rectificationGoal", "riskLevel", "dueDate", "status", "extension", "feedback", "hqRejectReason"]
+    relationships:
+      - "belongs_to ComplianceIssue"
+      - "has many RectificationFeedback versions or latest feedback"
+    enum_refs: ["issue_rectification_status", "ExtensionStatus"]
+    state_machine: "SM-ISSUE-RECTIFICATION"
+
+  - id: "RectificationFeedback"
+    priority: "P0"
+    purpose: "Branch feedback and evidence for rectification."
+    key_fields: ["feedbackId", "rectificationId", "content", "fileIds", "submittedBy", "submittedAt"]
+    relationships:
+      - "belongs_to RectificationRecord"
+      - "has many FileAsset"
+
+  - id: "IntegrationEvent"
+    priority: "P0"
+    purpose: "Adapter-backed integration event, including EKP reminder."
+    key_fields: ["integrationEventId", "type", "targetType", "targetId", "payload", "status", "createdBy", "createdAt", "externalRef"]
+    relationships:
+      - "may link to UnifiedTask, ComplianceIssue, EvidenceSubmission"
+
+dictionaries:
+  org_levels:
+    values: ["root", "dept", "branch", "sub-branch", "BRANCH_OFFICE", "BRANCH_COMPANY", "LINE_HEADQUARTERS", "COMPLIANCE_DEPARTMENT", "COMPLIANCE_DIRECTOR"]
+    mapping_note: "Frontend system mock uses root/dept/branch/sub-branch; backend permission/data-scope model uses business review levels. Implementation must map both through OrgNode.orgLevel and/or orgType."
+  risk_level: ["HIGH", "MEDIUM", "LOW"]
+  branch_portrait_risk_level:
+    values: ["SAFE", "WARNING", "CRITICAL"]
+    p0_usage: "dashboard/portrait guardrail only; do not reuse as issue risk level"
+  business_line: ["财富管理", "投资银行", "自营业务", "资产管理"]
+  inspection_status: ["DRAFT", "APPROVING", "IN_PROGRESS", "COMPLETED", "SUSPENDED", "TERMINATED"]
+  inspection_phase:
+    values:
+      - "PLAN_DRAFT"
+      - "PLAN_SUBMITTED"
+      - "PLAN_APPROVED"
+      - "EVIDENCE_COLLECTING"
+      - "EXECUTION_IN_PROGRESS"
+      - "FACT_CONFIRMATION"
+      - "ADJUDICATION"
+      - "REPORTING"
+      - "RECTIFICATION"
+      - "VERIFICATION"
+      - "CLOSED"
+      - "ARCHIVED"
+      - "CANCELLED"
+    runtime_source: "docs/ai-first/specs/status-dictionary.yaml"
+    legacy_frontend_aliases:
+      PREPARATION: "PLAN_DRAFT"
+      EXECUTION: "EXECUTION_IN_PROGRESS"
+  inspection_plan_type: ["ROUTINE_INSPECTION", "SPECIAL_INSPECTION", "DEPARTURE_AUDIT"]
+  inspection_plan_frequency: ["YEARLY", "HALF_YEARLY", "QUARTERLY", "AD_HOC"]
+  inspection_plan_attachment_type: ["INSPECTION_NOTICE", "ONSITE_INSPECTION_SCHEME", "WORKING_PAPER_TEMPLATE", "OTHER"]
+  ekp_flow_status: ["审批中", "已通过", "已驳回"]
+  working_paper_result: ["NO_ISSUE", "DEFICIENCY", "NOT_APPLICABLE", "PENDING"]
+  task_category: ["INSPECTION", "ASSESSMENT", "ISSUE"]
+  task_action_type: ["APPROVE", "SUBMIT", "RECTIFY", "REVIEW"]
+  task_status: ["PENDING", "DONE"]
+  issue_rectification_status:
+    source: "docs/ai-first/specs/status-dictionary.yaml"
+    values: ["DISCOVERED", "PENDING_RECTIFICATION", "RECTIFYING", "PENDING_VERIFICATION", "VERIFICATION_REJECTED", "OVERDUE", "CLOSED", "ARCHIVED"]
+  submission_status: ["PENDING", "SUBMITTED", "REJECTED", "APPROVED", "ISSUE_CREATED"]
+  evidence_tag: ["制度文件", "业务凭证", "会议纪要", "自查报告", "系统截图"]
+  extension_status: ["NONE", "PENDING", "APPROVED", "REJECTED"]
+  assessment_scheme_status:
+    values: ["DRAFT", "ACTIVE", "SUSPENDED", "EXPIRED", "ARCHIVED"]
+    p0_usage: "excluded assessment guardrail only"
+  fill_status:
+    values: ["NOT_STARTED", "IN_PROGRESS", "SUBMITTED", "RECALLED"]
+    p0_usage: "excluded assessment guardrail only"
+  i18n_strategy:
+    note: "Chinese business labels used by the frontend remain accepted only where they are still the canonical business value, such as businessLine and evidenceTag. InspectionPlan type/frequency now use ASCII canonical codes after SIT-DICT-05C, with Chinese retained as dictLabel/display text/history only. Status, phase, filter, action, role, permission, and target-kind values must use canonical codes; legacy aliases are not runtime business input compatibility."
+
+open_items:
+  - id: "ROLE-CODE-ALIGNMENT-001"
+    status: "implementation_constraint"
+    description: "Map frontend UserLevel/menuMode to seed ROLE_* and Casbin policies."
+  - id: "SEED-FINAL-001"
+    status: "pending_human_decision"
+    description: "Final WLZQ branch-office seed expansion remains unresolved."
+  - id: "AUDIT-P0-DTO-MAPPING-001"
+    status: "implementation_constraint"
+    description: "Implementation must map frontend generic `id` and display-label fields to canonical backend IDs and return compatibility view fields where needed."
+  - id: "AUDIT-P0-DICTIONARY-001"
+    status: "contract_updated"
+    description: "Dictionary section expanded from frontend enums/types audit."

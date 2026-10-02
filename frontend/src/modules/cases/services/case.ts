@@ -2820,7 +2820,7 @@ function mapDictItem(raw: Record<string, unknown>): DictItemRecord {
     parentId: raw.parent_id != null ? String(raw.parent_id) : (raw.parentId != null ? String(raw.parentId) : null),
     sortOrder: Number(raw.sort_order ?? raw.sortOrder ?? 0),
     isActive: Boolean(raw.is_active ?? raw.isActive ?? true),
-    remark: raw.remark != null ? String(raw.remark) : null,
+    remark: raw.remark != null ? String(raw.remark) : raw.description != null ? String(raw.description) : null,
     children,
   };
 }
@@ -2893,7 +2893,7 @@ export const createDictItem = async (params: {
   remark?: string | null;
 }): Promise<DictItemRecord | null> => {
   try {
-    const raw = await adminBffApi.dictItemsCreate(params);
+    const raw = await adminBffApi.dictItemsCreate({ ...params, description: params.remark });
     if (!raw) return null;
     return mapDictItem(raw as Record<string, unknown>);
   } catch (error) { throw error; }

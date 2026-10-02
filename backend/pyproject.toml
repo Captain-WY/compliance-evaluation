@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "compliance-evaluation-backend"
+version = "0.2.0"
+requires-python = ">=3.12,<3.14"
+dynamic = ["dependencies"]
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.lock"]}
+[tool.setuptools.packages.find]
+include = ["app*"]
+[tool.setuptools.package-data]
+app = ["resources/**/*.yaml", "resources/**/*.json"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

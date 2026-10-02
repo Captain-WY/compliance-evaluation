@@ -1,0 +1,175 @@
+schema_version: 1
+artifact_id: "CONTRACT-P1-PERMISSION"
+status: "frozen"
+generated_at: "2026-05-23T10:40:00+08:00"
+baseline_commit: "40096ff"
+frozen_by: "P1-FREEZE-001"
+frozen_at: "2026-05-23"
+
+auth_alignment:
+  identity_provider_target: "Casdoor"
+  authorization_engine_target: "Casbin"
+  adapter_rule: "Business APIs depend on auth/permission adapter, not Casdoor/Casbin internals."
+  frontend_menu_rule: "permittedMenuIds are UI hints only; backend checks are server-owned."
+
+personas:
+  - id: "persona_hq_compliance_manager"
+    roles: ["ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "all"
+    menu_ids:
+      - "hq-indicators"
+      - "hq-rules"
+      - "hq-workflow-center"
+      - "hq-review"
+      - "hq-assessment-dashboard"
+      - "hq-dashboard"
+      - "hq-branch-profile"
+  - id: "persona_compliance_director"
+    roles: ["ROLE_COMPLIANCE_DIRECTOR"]
+    data_scope: "all"
+  - id: "persona_hq_reviewer"
+    roles: ["ROLE_INSPECTION_LEAD", "ROLE_COMPLIANCE_MANAGER"]
+    data_scope: "assigned_or_project"
+    menu_ids:
+      - "hq-review"
+  - id: "persona_branch_compliance_officer"
+    roles: ["ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    data_scope: "organization"
+    menu_ids:
+      - "branch-reporting"
+      - "branch-daily-ledger"
+      - "branch-self-assessment"
+      - "branch-dashboard"
+  - id: "persona_branch_manager"
+    roles: ["ROLE_BRANCH_MANAGER"]
+    data_scope: "organization"
+
+candidate_permissions:
+  - id: "PERM-P1-ASSESSMENT-INDICATOR-READ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_INDICATOR"
+    actions: ["list", "read"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_INDICATOR"
+    actions: ["list", "read", "create", "update_draft", "clone_version", "validate_scoring_rule", "publish", "archive"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-SCHEME-READ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_SCHEME"
+    actions: ["list", "read"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_SCHEME"
+    actions: ["list", "read", "create", "update_draft", "copy", "delete_draft", "publish", "archive"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-CYCLE-DISPATCH"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_CYCLE"
+    actions: ["list", "read", "create_cycle", "select_targets", "dispatch", "send_reminder", "publish_results", "archive_cycle"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-CYCLE-READ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    resource: "ASSESSMENT_CYCLE"
+    actions: ["list", "read"]
+    data_scope: "all_or_assigned_project"
+  - id: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    roles: ["ROLE_BRANCH_COMPLIANCE_OFFICER", "ROLE_BRANCH_MANAGER"]
+    resource: "ASSESSMENT_REPORTING"
+    actions: ["list", "read", "save_draft", "submit", "recall", "upload_file", "bind_file_asset", "import_daily_ledger"]
+    data_scope: "organization"
+  - id: "PERM-P1-ASSESSMENT-DAILY-LEDGER-BRANCH"
+    roles: ["ROLE_BRANCH_COMPLIANCE_OFFICER", "ROLE_BRANCH_MANAGER"]
+    resource: "ASSESSMENT_DAILY_LEDGER"
+    actions: ["list", "read", "create", "update", "soft_delete", "upload_file", "bind_file_asset", "link_to_reporting"]
+    data_scope: "organization"
+  - id: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD"]
+    resource: "ASSESSMENT_REVIEW"
+    actions: ["list", "read", "start_review", "save_review_comment", "adjust_score", "approve", "return_to_branch", "apply_ai_insight_snapshot"]
+    data_scope: "assigned_or_project"
+    restrictions:
+      - "First P1 only supports APPROVE and RETURN_TO_BRANCH."
+      - "Business-line reviewer and L0/L1/L2/L3 review routing are deferred."
+  - id: "PERM-P1-ASSESSMENT-RESULT-HQ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_RESULT"
+    actions: ["list", "read", "generate", "publish", "finalize", "archive", "read_dashboard"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-RESULT-READ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD", "ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "ASSESSMENT_RESULT"
+    actions: ["list", "read"]
+    data_scope: "all_or_organization"
+  - id: "PERM-P1-ASSESSMENT-RESULT-BRANCH"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "ASSESSMENT_RESULT"
+    actions: ["list", "read", "confirm", "read_archive"]
+    data_scope: "organization"
+  - id: "PERM-P1-ASSESSMENT-SCORE-APPEAL-BRANCH"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "ASSESSMENT_SCORE_APPEAL"
+    actions: ["create_draft", "submit", "withdraw", "upload_file", "bind_file_asset", "read_own_org"]
+    data_scope: "organization"
+  - id: "PERM-P1-ASSESSMENT-SCORE-APPEAL-HQ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR"]
+    resource: "ASSESSMENT_SCORE_APPEAL"
+    actions: ["list", "read", "start_review", "adopt", "partially_adopt", "reject"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-DASHBOARD-HQ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    resource: "ASSESSMENT_DASHBOARD"
+    actions: ["read_global", "read_branch_portrait", "drilldown"]
+    data_scope: "all"
+  - id: "PERM-P1-ASSESSMENT-DASHBOARD-BRANCH"
+    roles: ["ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "ASSESSMENT_DASHBOARD"
+    actions: ["read_branch_portrait", "read_local_vital_signs"]
+    data_scope: "organization"
+  - id: "PERM-P1-DASHBOARD-HQ"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD"]
+    resource: "DASHBOARD_GOVERNANCE"
+    actions: ["read_global", "drilldown"]
+    data_scope: "all"
+  - id: "PERM-P1-DASHBOARD-BRANCH-PORTRAIT"
+    roles: ["ROLE_COMPLIANCE_MANAGER", "ROLE_COMPLIANCE_DIRECTOR", "ROLE_INSPECTION_LEAD", "ROLE_BRANCH_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    resource: "DASHBOARD_BRANCH_PORTRAIT"
+    actions: ["read_branch_portrait"]
+    data_scope: "all_or_organization"
+
+deferred_permissions:
+  - id: "PERM-P2-ASSESSMENT-REVIEW-LINE"
+    treatment: "future_guardrail_not_first_p1"
+    reason: "ROLE_BUSINESS_LINE_MANAGER and business_line data scope are not frozen."
+  - id: "PERM-P2-WORKFLOW-DESIGNER"
+    treatment: "P2_DEFERRED"
+  - id: "PERM-P2-ASSESSMENT-SCHEDULER"
+    treatment: "P2_DEFERRED"
+  - id: "PERM-P2-DATA-COCKPIT"
+    treatment: "P2_DEFERRED"
+  - id: "PERM-P2-NOTIFICATION"
+    treatment: "P2_COMMON_FOLLOWUP"
+  - id: "PERM-P2-ISSUE-PROJECT-TRACKER"
+    treatment: "P2_DEFERRED"
+    reason: "ProjectTrackerTab read model and overdue reminder command remain outside first P1."
+  - id: "PERM-P2-ISSUE-ANALYTICS-EXPORT"
+    treatment: "P2_DEFERRED"
+    reason: "AnalyticsDashboardTab and PNG export policy remain outside first P1."
+  - id: "PERM-P2-ASSESSMENT-CYCLE-CANCEL"
+    treatment: "P2_DEFERRED"
+    reason: "Cycle cancellation lacks first-P1 frontend action/test support and audit semantics."
+
+data_scope_rules:
+  all: "HQ compliance manager/director can access tenant-wide assessment data."
+  organization: "Branch actors can access records for their org subtree only."
+  assigned_or_project: "HQ reviewer can access assigned review task or project-scoped review records."
+  business_line:
+    status: "deferred"
+    reason: "Business-line reviewer semantics are not frozen."
+
+denial_requirements:
+  - "Branch user cannot read another branch reporting task/result/ledger/appeal."
+  - "Out-of-scope fileId binding returns 403 or FILE_ASSET_NOT_FOUND according to P0 file policy."
+  - "Frontend menu permission never substitutes backend authorization."

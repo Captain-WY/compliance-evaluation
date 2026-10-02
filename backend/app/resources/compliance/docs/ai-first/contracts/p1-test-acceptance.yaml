@@ -1,0 +1,140 @@
+schema_version: 1
+artifact_id: "CONTRACT-P1-TEST-ACCEPTANCE"
+status: "frozen"
+generated_at: "2026-05-23T10:40:00+08:00"
+baseline_commit: "40096ff"
+frozen_by: "P1-FREEZE-001"
+frozen_at: "2026-05-23"
+
+acceptance_scenarios:
+  - id: "AC-P1-FOUNDATION-001"
+    batch: "P1-01"
+    name: "Assessment shared foundation reuses P0 common models"
+    assertions:
+      - "Assessment seed references existing OrgNode and AuthUser rows."
+      - "Assessment task records create UnifiedTask rows with category ASSESSMENT."
+      - "Assessment evidence and appeal attachments first create FileAsset via /api/files."
+      - "Backend dictionary validation rejects non-canonical status/action codes."
+
+  - id: "AC-P1-INDICATOR-001"
+    batch: "P1-02"
+    name: "HQ manages indicator versions and scoring rules"
+    assertions:
+      - "HQ can create indicator draft with category, data type, variables, scoring rule, and evidence templates."
+      - "Invalid formula or overlapping interval bands return VALIDATION_ERROR."
+      - "Unsafe formula tokens or code-execution constructs are rejected; backend scoring validation must not use eval, new Function, Python exec/eval, or runtime code generation."
+      - "Publish moves indicator version from DRAFT to PUBLISHED only when scoring rule validates."
+      - "Published indicator core scoring fields are read-only."
+
+  - id: "AC-P1-SCHEME-001"
+    batch: "P1-03"
+    name: "HQ assembles and publishes assessment scheme"
+    assertions:
+      - "Scheme draft can include published indicator versions with weights and grade thresholds."
+      - "Weight total mismatch returns VALIDATION_ERROR."
+      - "Overlapping grade thresholds return VALIDATION_ERROR."
+      - "Publishing freezes scheme snapshot basis and moves DRAFT to ACTIVE."
+
+  - id: "AC-P1-DISPATCH-001"
+    batch: "P1-04"
+    name: "HQ dispatches an assessment cycle and creates task-center items"
+    assertions:
+      - "Cycle can be created only from ACTIVE scheme."
+      - "Target orgs resolve to OrgNode and pass HQ data-scope checks."
+      - "Dispatch creates AssessmentCycleTarget, AssessmentReportingTask, and UnifiedTask rows."
+      - "Branch user sees only organization-scoped ASSESSMENT tasks."
+      - "GET /api/tasks/{taskId}/target resolves assessment deep link without marking done."
+
+  - id: "AC-P1-REPORTING-001"
+    batch: "P1-05"
+    name: "Branch saves, submits, and resubmits reporting with real file evidence"
+    assertions:
+      - "Branch can create daily ledger entry and bind FileAsset attachments scoped to its org."
+      - "Branch can import a ledger entry into an assessment response item."
+      - "Draft save moves reporting task to IN_PROGRESS."
+      - "Submit requires required item values and required evidence."
+      - "HQ return moves reporting task to RETURNED with required reason."
+      - "Branch resubmission returns task to SUBMITTED."
+
+  - id: "AC-P1-REVIEW-001"
+    batch: "P1-06"
+    name: "HQ reviewer reviews reporting and adjusts score"
+    assertions:
+      - "Reviewer can list only assigned or scope-permitted review tasks."
+      - "Reviewer can save score comments and score adjustments."
+      - "Approve requires all required review items complete and valid score adjustments."
+      - "Return to branch requires decisionReason and reopens branch task."
+      - "AI insight can be stored as an optional snapshot but tests do not require live AI scoring."
+
+  - id: "AC-P1-RESULT-APPEAL-001"
+    batch: "P1-07"
+    name: "Result confirmation and score appeal close the branch-facing loop"
+    assertions:
+      - "HQ publishes result only after required reviews are approved."
+      - "Branch can confirm only its own org result."
+      - "Branch can submit score appeal for deducted result items with reason and optional FileAsset evidence."
+      - "Overdue unconfirmed results become AUTO_CONFIRMED and are treated as default confirmed."
+      - "HQ appeal decision requires decisionReason."
+      - "Adopted or partially adopted appeal refreshes result item score and total score."
+      - "Result cannot finalize while score appeal is SUBMITTED or UNDER_REVIEW."
+
+  - id: "AC-P1-DASHBOARD-READMODEL-001"
+    batch: "P1-08"
+    name: "Assessment dashboard and branch portrait are read-only aggregations"
+    assertions:
+      - "HQ dashboard aggregates P1 AssessmentResult and P0 issue/rectification data."
+      - "Branch dashboard returns only organization-scoped portrait data."
+      - "Dashboard APIs do not create durable write records."
+      - "Drilldown links resolve to route contracts and do not bypass data scope."
+
+  - id: "AC-P1-PERMISSION-SCOPE-001"
+    batch: "P1-09"
+    name: "Cross-role data-scope denial is enforced"
+    assertions:
+      - "HQ compliance manager can read all cycle targets and results."
+      - "Branch user cannot read another branch reporting task, result, ledger entry, or score appeal."
+      - "Assigned HQ reviewer can only read assigned or project-scoped review tasks."
+      - "Denied access returns 403 FORBIDDEN."
+
+  - id: "AC-P1-E2E-001"
+    batch: "P1-09"
+    name: "P1 cross-role browser smoke vertical flow"
+    assertions:
+      - "HQ creates/publishes indicator and scheme, then dispatches cycle in real API mode."
+      - "Branch opens ASSESSMENT task, uploads real file through /api/files, saves and submits reporting."
+      - "HQ returns once, then approves after branch resubmission."
+      - "HQ publishes result; branch confirms or submits score appeal with real FileAsset evidence."
+      - "At least one overdue unconfirmed result follows the AUTO_CONFIRMED default-confirmation path."
+      - "HQ decides appeal; result finalizes and dashboard read model reflects updated score."
+      - "P1 real API mode has no silent mock fallback; P2 deferred tools show visible boundary if rendered."
+
+quality_gates:
+  every_work_packet:
+    - "verification report"
+    - "T6 implementation audit"
+    - "T7 challenging review"
+    - "remediation and re-review for Blocker/High/Medium"
+  final_go_no_go:
+    - "browser-level P1 E2E evidence"
+    - "real auth"
+    - "real API"
+    - "real /api/files upload"
+    - "no silent mock fallback"
+
+state_machine_contract_refs:
+  canonical_state_machine_spec: "docs/ai-first/specs/p1-state-machines.yaml"
+  required_test_alignment:
+    - "AC-P1-INDICATOR-001 must cover SM-P1-INDICATOR-VERSION and scoring_formula_policy."
+    - "AC-P1-SCHEME-001 must cover SM-P1-ASSESSMENT-SCHEME."
+    - "AC-P1-DISPATCH-001 must cover SM-P1-ASSESSMENT-CYCLE-ROLLUP and SM-P1-ASSESSMENT-CYCLE-TARGET."
+    - "AC-P1-REPORTING-001 must cover SM-P1-ASSESSMENT-REPORTING."
+    - "AC-P1-REVIEW-001 must cover SM-P1-ASSESSMENT-REVIEW."
+    - "AC-P1-RESULT-APPEAL-001 must cover SM-P1-ASSESSMENT-RESULT-CONFIRMATION and SM-P1-ASSESSMENT-SCORE-APPEAL."
+
+p1_e2e_exclusions:
+  - id: "E2E-P1-ISSUE-CORE-ONLY"
+    excluded_scope: "ProjectTrackerTab / P2-ISSUE-06A"
+    expectation: "P1 E2E may visit P0 issue hub only for existing P0 core flows; project tracker tab must not be required."
+  - id: "E2E-P1-NO-P2-MOCK-DEPENDENCY"
+    excluded_scope: "AnalyticsDashboardTab / P2-ISSUE-06B and P2 assessment tools"
+    expectation: "P1 E2E must not rely on P2 mock-only analytics/export surfaces."

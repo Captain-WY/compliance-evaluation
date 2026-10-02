@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import sys
 import uuid
@@ -14,6 +15,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".local/smoke-state.json"
@@ -113,6 +115,20 @@ def main():
             smoke.request("POST", "/api/bff/v1/cases/detail/sidebar", {"case_id": state["case"]}, role=role, expected=(403, 404))
     smoke.check("case detail and nonmember access rejected", case_scope)
 
+    def attachment_scope():
+        smoke.request("POST", "/api/bff/v1/attachments/list", {"businessType": "CASE", "businessId": state["case"]})
+        url = urlsplit(smoke.base)
+        connection = http.client.HTTPConnection(url.hostname, url.port, timeout=30)
+        try:
+            connection.request("POST", "/api/bff/v1/attachments/list", body=json.dumps({"businessType": "CASE", "businessId": state["case"]}), headers={"Authorization": "Bearer " + smoke.tokens["external_lawyer"]})
+            response = connection.getresponse()
+            response.read()
+            assert response.status in (403, 404), f"Attachment no-content-type bypass: HTTP {response.status}"
+        finally:
+            connection.close()
+    smoke.check("attachment scope without content-type header", attachment_scope)
+
+
     def clue_scope():
         if not args.verify_existing:
             state["hq_clue"] = unwrap(smoke.request("POST", "/api/bff/v1/clues/create", {"clue_title": state["prefix"] + "-HQ", "source_type": "MANUAL"}))["clue_id"]
@@ -124,6 +140,11 @@ def main():
         smoke.request("POST", "/api/bff/v1/clues/update", {"clue_id": state["hq_clue"], "clue_title": "DENIED"}, role="branch_business", expected=(403, 404))
     smoke.check("branch clue own read and foreign write rejection", clue_scope)
     smoke.check("lawyer portal initialized", lambda: smoke.request("POST", "/api/bff/v1/vendor-portal/summary", {}, role="external_lawyer"))
+    def lawyer_cases():
+        result = rows(smoke.request("POST", "/api/bff/v1/vendor-portal/my-cases", {"page": 1, "pageSize": 20}, role="external_lawyer"))
+        assert all(r.get("caseId") != state.get("case") for r in result), "Unassigned case visible to lawyer"
+    smoke.check("lawyer case list excludes unassigned cases", lawyer_cases)
+
 
 
 
@@ -156,6 +177,7 @@ def main():
         assert any(r["id"] == state["dictionary"] and r["dictLabel"].endswith("-updated") for r in result), "Dictionary update missing"
         for path in ("/api/v1/dicts?type=MERGE_TEST", "/api/system/dictionary-admin/items?dictType=MERGE_TEST"):
             assert state["prefix"] + "-updated" in json.dumps(smoke.request("GET", path)), "Shared dictionary missing in business reader"
+        assert state["prefix"] + "-updated" in json.dumps(smoke.request("POST", "/api/bff/v1/admin/dicts/items/tree", {"dictType": "MERGE_TEST"})), "Dictionary tree missing item"
         STATE.write_text(json.dumps(state), encoding="utf-8")
     smoke.check("common dictionary create update and both business readers", dictionary)
 

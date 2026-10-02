@@ -113,7 +113,7 @@ const DictTreeNode: React.FC<DictTreeNodeProps> = ({ node, dictType, depth, onRe
   const handleToggle = async () => {
     try {
     setToggling(true);
-    await updateDictItem({ dictId: node.dictId, version: node.version, dictName: node.dictName, sortOrder: node.sortOrder, isActive: !node.isActive });
+    await updateDictItem({ dictId: node.dictId, version: node.version, dictName: node.dictName, sortOrder: node.sortOrder, isActive: !node.isActive, remark: node.remark });
     setToggling(false);
     onRefresh();
   
@@ -178,6 +178,7 @@ const DictAdmin: React.FC = () => {
   const [tree, setTree] = useState<DictItemRecord[]>([]);
   const [loadingTypes, setLoadingTypes] = useState(true);
   const [loadingTree, setLoadingTree] = useState(false);
+  const [treeError, setTreeError] = useState<string | null>(null);
   const [addingRoot, setAddingRoot] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
 
@@ -193,14 +194,18 @@ const DictAdmin: React.FC = () => {
   };
 
   const loadTree = async () => {
-    try {
     if (!selectedType) return;
     setLoadingTree(true);
-    const data = await getDictTree(selectedType);
-    setTree(data);
-    setLoadingTree(false);
-  
-    } catch(error) { toast.error(error instanceof Error ? error.message : '操作失败，请重试'); } finally {setLoadingTree(false);}
+    setTreeError(null);
+    try {
+      const data = await getDictTree(selectedType);
+      setTree(data);
+    } catch(error) {
+      setTree([]);
+      setTreeError(error instanceof Error ? error.message : '字典项加载失败');
+    } finally {
+      setLoadingTree(false);
+    }
   };
 
   useEffect(() => { loadTypes(); }, []);
@@ -266,6 +271,11 @@ const DictAdmin: React.FC = () => {
 
           {loadingTree ? (
             <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin text-slate-300 mx-auto" /></div>
+          ) : treeError ? (
+            <div role="alert" className="p-6 text-sm text-red-700">
+              <p>字典项加载失败：{treeError}</p>
+              <Button size="sm" variant="ghost" onClick={loadTree}>重试</Button>
+            </div>
           ) : !selectedType ? (
             <div className="p-8 text-center text-sm text-slate-400">请在左侧选择字典类型</div>
           ) : tree.length === 0 ? (

@@ -1,0 +1,160 @@
+schema_version: 1
+artifact_id: "CONTRACT-P1-ENTITY"
+status: "frozen"
+generated_at: "2026-05-23T10:40:00+08:00"
+baseline_commit: "40096ff"
+frozen_by: "P1-FREEZE-001"
+frozen_at: "2026-05-23"
+
+model_policy:
+  p0_reuse_required:
+    - "OrgNode"
+    - "AuthUser"
+    - "UnifiedTask"
+    - "FileAsset"
+  snapshot_policy:
+    - "Durable records store stable org/user IDs plus display snapshots."
+  dashboard_policy:
+    - "Dashboard records are read models computed from P0/P1 sources."
+  cycle_status_policy:
+    - "AssessmentCycle.status is derived rollup/read-model status, not the authoritative target/result/appeal state."
+
+reused_p0_entities:
+  OrgNode:
+    used_by:
+      - "AssessmentTargetGroupMember.orgId"
+      - "AssessmentCycleTarget.orgId"
+      - "AssessmentReportingTask.targetOrgId"
+      - "AssessmentResult.targetOrgId"
+      - "dashboard org filters"
+  AuthUser:
+    used_by:
+      - "createdBy/publishedBy/submittedBy/reviewedBy/decidedBy"
+  UnifiedTask:
+    used_by:
+      - "AssessmentReportingTask.unifiedTaskId"
+      - "AssessmentReviewTask.unifiedTaskId"
+      - "result confirmation and appeal review task items"
+  FileAsset:
+    used_by:
+      - "AssessmentResponseEvidence.fileId"
+      - "DailyComplianceLedgerAttachment.fileId"
+      - "AssessmentScoreAppealAttachment.fileId"
+
+entity_groups:
+  assessment_foundation:
+    batch: "P1-01/P1-02"
+    entities:
+      - "AssessmentIndicatorCategory"
+      - "AssessmentIndicator"
+      - "IndicatorVersion"
+      - "IndicatorVariable"
+      - "ScoringRule"
+      - "ScoringRuleBand"
+      - "QualitativeRubricItem"
+      - "AssessmentEvidenceTemplate"
+  assessment_scheme:
+    batch: "P1-03"
+    entities:
+      - "AssessmentScheme"
+      - "AssessmentSchemeItem"
+      - "AssessmentGradeThreshold"
+      - "AssessmentVolumeAdjustmentFactor"
+      - "AssessmentTargetGroup"
+      - "AssessmentTargetGroupMember"
+  assessment_cycle_and_dispatch:
+    batch: "P1-04"
+    entities:
+      - "AssessmentCycle"
+      - "AssessmentCycleTarget"
+      - "AssessmentDispatchEvent"
+  branch_reporting_and_daily_ledger:
+    batch: "P1-05"
+    entities:
+      - "AssessmentReportingTask"
+      - "AssessmentResponseItem"
+      - "AssessmentResponseEvidence"
+      - "DailyComplianceLedgerEntry"
+      - "DailyComplianceLedgerAttachment"
+  hq_review_and_score_adjustment:
+    batch: "P1-06"
+    entities:
+      - "AssessmentReviewTask"
+      - "AssessmentReviewItem"
+      - "AssessmentScoreAdjustment"
+      - "AssessmentReviewDecision"
+      - "AssessmentAIInsightSnapshot"
+  result_confirmation_and_score_appeal:
+    batch: "P1-07"
+    entities:
+      - "AssessmentResult"
+      - "AssessmentResultItem"
+      - "AssessmentResultConfirmation"
+      - "AssessmentScoreAppeal"
+      - "AssessmentScoreAppealItem"
+      - "AssessmentScoreAppealAttachment"
+      - "AssessmentRecordArchive"
+  dashboard_and_portrait_read_models:
+    batch: "P1-08"
+    entities:
+      - "AssessmentResultAggregateReadModel"
+
+key_entity_fields:
+  AssessmentCycle:
+    identity: ["cycleId", "cycleCode"]
+    references: ["schemeId", "schemeSnapshot", "createdBy", "dispatchedBy"]
+    status_fields:
+      - name: "status"
+        semantics: "derived_rollup"
+        source: "AssessmentCycleTarget.targetStatus + AssessmentResult.confirmationStatus + AssessmentScoreAppeal.status"
+    timestamps: ["periodStart", "periodEnd", "dispatchedAt", "closedAt"]
+  AssessmentCycleTarget:
+    identity: ["cycleTargetId"]
+    references: ["cycleId", "orgId", "reportingTaskId", "reviewTaskId", "resultId"]
+    authoritative_status: "targetStatus"
+    snapshots: ["orgSnapshot"]
+  AssessmentReportingTask:
+    identity: ["reportingTaskId"]
+    references: ["cycleId", "cycleTargetId", "targetOrgId", "unifiedTaskId"]
+    authoritative_status: "status"
+  AssessmentReviewTask:
+    identity: ["reviewTaskId"]
+    references: ["cycleId", "cycleTargetId", "reportingTaskId", "assigneeUserId", "unifiedTaskId"]
+    authoritative_status: "status"
+    first_p1_review_scope: "assigned_hq_reviewer"
+  AssessmentResult:
+    identity: ["resultId"]
+    references: ["cycleId", "cycleTargetId", "targetOrgId"]
+    status_fields:
+      - "status"
+      - "confirmationStatus"
+    required_fields:
+      - "confirmationDeadline"
+    policy:
+      - "If confirmationDeadline passes without branch confirmation or open appeal, confirmationStatus becomes AUTO_CONFIRMED."
+  AssessmentScoreAppeal:
+    identity: ["scoreAppealId"]
+    references: ["resultId", "targetOrgId", "submittedBy", "decidedBy"]
+    authoritative_status: "status"
+
+deferred_or_optional_model_items:
+  - id: "business_line_reviewer"
+    treatment: "future_guardrail"
+    reason: "L0/L1/L2/L3 and business-line reviewer semantics are not frozen."
+  - id: "generic_workflow_engine"
+    treatment: "P2_DEFERRED"
+  - id: "assessment_scheduler_runtime"
+    treatment: "P2_DEFERRED"
+  - id: "external_data_collection_runtime"
+    treatment: "P2_DEFERRED"
+  - id: "live_ai_scoring_runtime"
+    treatment: "optional_snapshot_only"
+
+relationship_summary:
+  - "AssessmentScheme has many AssessmentSchemeItem, each referencing a published IndicatorVersion."
+  - "AssessmentCycle is created from an ACTIVE AssessmentScheme and stores a schemeSnapshot."
+  - "AssessmentCycleTarget references P0 OrgNode and stores orgSnapshot."
+  - "AssessmentReportingTask and AssessmentReviewTask create P0 UnifiedTask rows."
+  - "AssessmentResponseEvidence, ledger attachments, and score appeal attachments reference P0 FileAsset."
+  - "AssessmentResult feeds dashboard read models and branch portrait rollups."
+  - "AUTO_CONFIRMED AssessmentResult rows are treated as confirmed for finalization and dashboard rollups."

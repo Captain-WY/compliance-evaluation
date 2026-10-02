@@ -1,0 +1,406 @@
+schema_version: 1
+artifact_id: "CONTRACT-P1-API"
+status: "frozen"
+generated_at: "2026-05-23T10:40:00+08:00"
+baseline_commit: "40096ff"
+frozen_by: "P1-FREEZE-001"
+frozen_at: "2026-05-23"
+
+api_policy:
+  base_prefix: "/api"
+  auth: "Bearer token from P0 auth/session model"
+  error_model: "Reuse P0 unified error model"
+  pagination: "Reuse P0 page/pageSize pagination"
+  file_upload: "Reuse POST /api/files before binding fileId"
+  canonical_values: "Reject non-canonical dictionary/status codes"
+
+endpoints:
+  - id: "P1-API-INDICATOR-LIST"
+    method: "GET"
+    path: "/api/assessment/indicators"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-READ"
+    query: ["keyword", "categoryId", "businessLine", "status", "page", "pageSize"]
+    response_entities: ["AssessmentIndicatorSummary"]
+  - id: "P1-API-INDICATOR-CREATE"
+    method: "POST"
+    path: "/api/assessment/indicators"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    request_entities: ["AssessmentIndicatorDraftCreate"]
+    response_entities: ["AssessmentIndicatorDetail"]
+  - id: "P1-API-INDICATOR-UPDATE-DRAFT"
+    method: "PATCH"
+    path: "/api/assessment/indicators/{indicatorId}/versions/{versionId}"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    state_guard: "IndicatorVersion.status == DRAFT"
+  - id: "P1-API-INDICATOR-VALIDATE-SCORING"
+    method: "POST"
+    path: "/api/assessment/indicators/{indicatorId}/versions/{versionId}/validate-scoring"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    contract_refs:
+      - "docs/ai-first/specs/p1-state-machines.yaml#scoring_formula_policy"
+    security_policy:
+      - "Backend evaluator must use a whitelisted expression parser."
+      - "Backend evaluator must not use eval, new Function, Python exec/eval, dynamic import, or runtime code generation."
+  - id: "P1-API-INDICATOR-PUBLISH"
+    method: "POST"
+    path: "/api/assessment/indicators/{indicatorId}/versions/{versionId}/publish"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    state_guard: "DRAFT -> PUBLISHED"
+  - id: "P1-API-INDICATOR-ARCHIVE"
+    method: "POST"
+    path: "/api/assessment/indicators/{indicatorId}/versions/{versionId}/archive"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    state_guard: "DRAFT|PUBLISHED -> ARCHIVED"
+    request_entities: ["ArchiveReasonRequest"]
+  - id: "P1-API-INDICATOR-CLONE"
+    method: "POST"
+    path: "/api/assessment/indicators/{indicatorId}/versions/{versionId}/clone"
+    permission: "PERM-P1-ASSESSMENT-INDICATOR-MANAGE"
+    response_entities: ["AssessmentIndicatorDetail"]
+
+  - id: "P1-API-SCHEME-LIST"
+    method: "GET"
+    path: "/api/assessment/schemes"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-READ"
+    query: ["keyword", "year", "status", "frequency", "page", "pageSize"]
+    response_entities: ["AssessmentSchemeSummaryPage"]
+  - id: "P1-API-SCHEME-DETAIL"
+    method: "GET"
+    path: "/api/assessment/schemes/{schemeId}"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-READ"
+    response_entities: ["AssessmentSchemeDetail"]
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND"]
+  - id: "P1-API-SCHEME-VALIDATE-CREATE"
+    method: "POST"
+    path: "/api/assessment/schemes/validate"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    request_entities: ["AssessmentSchemeDraftCreatePreflightRequest"]
+    response_entities: ["AssessmentSchemeValidationResult"]
+    metadata_policy: "preflight only; idempotencyKey and optimisticVersion are not required"
+    errors: ["403 FORBIDDEN", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-VALIDATE-DRAFT"
+    method: "POST"
+    path: "/api/assessment/schemes/{schemeId}/validate"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    request_entities: ["AssessmentSchemeDraftValidateRequest"]
+    response_entities: ["AssessmentSchemeValidationResult"]
+    state_guard: "AssessmentScheme.status == DRAFT"
+    metadata_policy: "requires optimisticVersion; does not require idempotencyKey because it is non-mutating"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_STATE", "409 VERSION_CONFLICT", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-CREATE"
+    method: "POST"
+    path: "/api/assessment/schemes"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    request_entities: ["AssessmentSchemeDraftCreateRequest"]
+    response_entities: ["AssessmentSchemeDetail"]
+    metadata_policy: "requires idempotencyKey; optimisticVersion is not applicable for collection create"
+    errors: ["403 FORBIDDEN", "409 DUPLICATE_SCHEME_CODE", "409 IDEMPOTENCY_KEY_CONFLICT", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-UPDATE-DRAFT"
+    method: "PATCH"
+    path: "/api/assessment/schemes/{schemeId}"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    state_guard: "AssessmentScheme.status == DRAFT"
+    request_entities: ["AssessmentSchemeDraftUpdateRequest"]
+    response_entities: ["AssessmentSchemeDetail"]
+    metadata_policy: "requires idempotencyKey and optimisticVersion"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_STATE", "409 VERSION_CONFLICT", "409 IDEMPOTENCY_KEY_CONFLICT", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-PUBLISH"
+    method: "POST"
+    path: "/api/assessment/schemes/{schemeId}/publish"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    state_guard: "DRAFT -> ACTIVE"
+    request_entities: ["AssessmentSchemeCommandRequest"]
+    response_entities: ["AssessmentSchemeDetail"]
+    metadata_policy: "requires idempotencyKey and optimisticVersion"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_TRANSITION", "409 VERSION_CONFLICT", "409 IDEMPOTENCY_KEY_CONFLICT", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-COPY"
+    method: "POST"
+    path: "/api/assessment/schemes/{schemeId}/copy"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    request_entities: ["AssessmentSchemeCopyRequest"]
+    response_entities: ["AssessmentSchemeDetail"]
+    metadata_policy: "requires idempotencyKey and source optimisticVersion"
+    state_guard: "source status != ARCHIVED; ACTIVE copy-to-draft is allowed with sourceTrace"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_STATE", "409 VERSION_CONFLICT", "409 IDEMPOTENCY_KEY_CONFLICT", "409 DUPLICATE_SCHEME_CODE", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-DELETE-DRAFT"
+    method: "DELETE"
+    path: "/api/assessment/schemes/{schemeId}"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    state_guard: "delete only never-published DRAFT schemes"
+    request_entities: ["AssessmentSchemeCommandRequest"]
+    response_entities: ["AssessmentSchemeDeleteResult"]
+    metadata_policy: "requires idempotencyKey and optimisticVersion"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_STATE", "409 VERSION_CONFLICT", "409 IDEMPOTENCY_KEY_CONFLICT", "422 VALIDATION_ERROR"]
+  - id: "P1-API-SCHEME-ARCHIVE"
+    method: "POST"
+    path: "/api/assessment/schemes/{schemeId}/archive"
+    permission: "PERM-P1-ASSESSMENT-SCHEME-MANAGE"
+    state_guard: "DRAFT|SUSPENDED|EXPIRED -> ARCHIVED; ACTIVE -> ARCHIVED is rejected by default"
+    request_entities: ["AssessmentSchemeArchiveRequest"]
+    response_entities: ["AssessmentSchemeDetail"]
+    metadata_policy: "requires reason, idempotencyKey, and optimisticVersion"
+    errors: ["403 FORBIDDEN", "404 SCHEME_NOT_FOUND", "409 INVALID_TRANSITION", "409 VERSION_CONFLICT", "409 IDEMPOTENCY_KEY_CONFLICT", "422 VALIDATION_ERROR"]
+
+  - id: "P1-API-CYCLE-LIST"
+    method: "GET"
+    path: "/api/assessment/cycles"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-READ"
+    query: ["status", "schemeId", "year", "page", "pageSize"]
+  - id: "P1-API-CYCLE-CREATE"
+    method: "POST"
+    path: "/api/assessment/cycles"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-DISPATCH"
+  - id: "P1-API-CYCLE-DISPATCH"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/dispatch"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-DISPATCH"
+    side_effects:
+      - "create AssessmentCycleTarget"
+      - "create AssessmentReportingTask"
+      - "create UnifiedTask category ASSESSMENT"
+  - id: "P1-API-CYCLE-DETAIL"
+    method: "GET"
+    path: "/api/assessment/cycles/{cycleId}"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-READ"
+  - id: "P1-API-CYCLE-REMINDER"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/reminders"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-DISPATCH"
+    notes: "Creates reminder event only; notification delivery is adapter/common follow-up."
+  - id: "P1-API-CYCLE-PUBLISH-RESULTS"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/publish-results"
+    permission: "PERM-P1-ASSESSMENT-RESULT-HQ"
+    state_guard: "all required reviews approved"
+  - id: "P1-API-CYCLE-ARCHIVE"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/archive"
+    permission: "PERM-P1-ASSESSMENT-CYCLE-DISPATCH"
+    state_guard: "derived cycle rollup is CLOSED"
+
+  - id: "P1-API-REPORTING-LIST"
+    method: "GET"
+    path: "/api/assessment/reporting-tasks"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    data_scope: "organization"
+  - id: "P1-API-REPORTING-DETAIL"
+    method: "GET"
+    path: "/api/assessment/reporting-tasks/{reportingTaskId}"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+  - id: "P1-API-REPORTING-SAVE-DRAFT"
+    method: "PATCH"
+    path: "/api/assessment/reporting-tasks/{reportingTaskId}"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    state_guard: "NOT_STARTED|IN_PROGRESS|RECALLED|RETURNED -> IN_PROGRESS"
+  - id: "P1-API-REPORTING-SUBMIT"
+    method: "POST"
+    path: "/api/assessment/reporting-tasks/{reportingTaskId}/submit"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    state_guard: "IN_PROGRESS|RECALLED|RETURNED -> SUBMITTED"
+    file_policy: "response evidence binds existing scoped fileIds"
+  - id: "P1-API-REPORTING-RECALL"
+    method: "POST"
+    path: "/api/assessment/reporting-tasks/{reportingTaskId}/recall"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    state_guard: "SUBMITTED -> RECALLED when review_not_started"
+  - id: "P1-API-REPORTING-IMPORT-LEDGER"
+    method: "POST"
+    path: "/api/assessment/reporting-tasks/{reportingTaskId}/import-ledger"
+    permission: "PERM-P1-ASSESSMENT-REPORT-BRANCH"
+    request_entities: ["AssessmentLedgerImportRequest"]
+    state_guard: "NOT_STARTED|IN_PROGRESS|RECALLED|RETURNED -> IN_PROGRESS"
+    notes: "Imports a scoped DailyComplianceLedgerEntry into one or more response items; does not copy file bytes."
+
+  - id: "P1-API-DAILY-LEDGER-LIST"
+    method: "GET"
+    path: "/api/assessment/daily-ledger"
+    permission: "PERM-P1-ASSESSMENT-DAILY-LEDGER-BRANCH"
+    data_scope: "organization"
+  - id: "P1-API-DAILY-LEDGER-CREATE"
+    method: "POST"
+    path: "/api/assessment/daily-ledger"
+    permission: "PERM-P1-ASSESSMENT-DAILY-LEDGER-BRANCH"
+  - id: "P1-API-DAILY-LEDGER-UPDATE"
+    method: "PATCH"
+    path: "/api/assessment/daily-ledger/{ledgerEntryId}"
+    permission: "PERM-P1-ASSESSMENT-DAILY-LEDGER-BRANCH"
+  - id: "P1-API-DAILY-LEDGER-SOFT-DELETE"
+    method: "DELETE"
+    path: "/api/assessment/daily-ledger/{ledgerEntryId}"
+    permission: "PERM-P1-ASSESSMENT-DAILY-LEDGER-BRANCH"
+    side_effects: ["soft_delete_with_audit_trail"]
+
+  - id: "P1-API-REVIEW-LIST"
+    method: "GET"
+    path: "/api/assessment/review-tasks"
+    permission: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+    data_scope: "assigned_or_project"
+  - id: "P1-API-REVIEW-DETAIL"
+    method: "GET"
+    path: "/api/assessment/review-tasks/{reviewTaskId}"
+    permission: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+  - id: "P1-API-REVIEW-START"
+    method: "POST"
+    path: "/api/assessment/review-tasks/{reviewTaskId}/start"
+    permission: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+    state_guard: "PENDING -> IN_REVIEW"
+  - id: "P1-API-REVIEW-SAVE"
+    method: "PATCH"
+    path: "/api/assessment/review-tasks/{reviewTaskId}"
+    permission: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+    request_entities: ["AssessmentReviewPatch"]
+    notes: "Persists comments, item scores, and optional AI insight snapshot."
+  - id: "P1-API-REVIEW-DECISION"
+    method: "POST"
+    path: "/api/assessment/review-tasks/{reviewTaskId}/decision"
+    permission: "PERM-P1-ASSESSMENT-REVIEW-HQ"
+    allowed_decisions: ["APPROVE", "RETURN_TO_BRANCH"]
+
+  - id: "P1-API-RESULT-LIST"
+    method: "GET"
+    path: "/api/assessment/results"
+    permission: "PERM-P1-ASSESSMENT-RESULT-READ"
+    auto_confirm_policy: "Before returning results, server applies AUTO_CONFIRMED for overdue unconfirmed results with no open appeal."
+  - id: "P1-API-RESULT-DETAIL"
+    method: "GET"
+    path: "/api/assessment/results/{resultId}"
+    permission: "PERM-P1-ASSESSMENT-RESULT-READ"
+    auto_confirm_policy: "Before returning the result, server applies AUTO_CONFIRMED when confirmationDeadline has passed and no open appeal exists."
+  - id: "P1-API-RESULT-PUBLISH"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/publish-results"
+    permission: "PERM-P1-ASSESSMENT-RESULT-HQ"
+    alias_of: "P1-API-CYCLE-PUBLISH-RESULTS"
+  - id: "P1-API-RESULT-GENERATE"
+    method: "POST"
+    path: "/api/assessment/cycles/{cycleId}/generate-results"
+    permission: "PERM-P1-ASSESSMENT-RESULT-HQ"
+    state_guard: "all required reviews approved"
+    response_entities: ["AssessmentResultSummary"]
+  - id: "P1-API-RESULT-CONFIRM"
+    method: "POST"
+    path: "/api/assessment/results/{resultId}/confirm"
+    permission: "PERM-P1-ASSESSMENT-RESULT-BRANCH"
+    data_scope: "organization"
+  - id: "P1-API-RESULT-FINALIZE"
+    method: "POST"
+    path: "/api/assessment/results/{resultId}/finalize"
+    permission: "PERM-P1-ASSESSMENT-RESULT-HQ"
+    state_guard: "no open score appeal; PENDING_CONFIRMATION past confirmationDeadline is first moved to AUTO_CONFIRMED"
+  - id: "P1-API-SCORE-APPEAL-SUBMIT"
+    method: "POST"
+    path: "/api/assessment/results/{resultId}/appeals"
+    permission: "PERM-P1-ASSESSMENT-SCORE-APPEAL-BRANCH"
+    file_policy: "bind existing scoped fileIds"
+  - id: "P1-API-SCORE-APPEAL-DECISION"
+    method: "POST"
+    path: "/api/assessment/score-appeals/{scoreAppealId}/decision"
+    permission: "PERM-P1-ASSESSMENT-SCORE-APPEAL-HQ"
+
+  - id: "P1-API-ASSESSMENT-DASHBOARD"
+    method: "GET"
+    path: "/api/assessment/dashboard/overview"
+    permission: "PERM-P1-ASSESSMENT-DASHBOARD-HQ"
+    read_model_only: true
+  - id: "P1-API-GOVERNANCE-DASHBOARD"
+    method: "GET"
+    path: "/api/dashboard/governance"
+    permission: "PERM-P1-DASHBOARD-HQ"
+    read_model_only: true
+  - id: "P1-API-BRANCH-PORTRAIT"
+    method: "GET"
+    path: "/api/dashboard/branches/{orgId}/portrait"
+    permission: "PERM-P1-DASHBOARD-BRANCH-PORTRAIT"
+    read_model_only: true
+
+scheme_command_metadata_contract:
+  create_draft:
+    dto: "AssessmentSchemeDraftCreateRequest"
+    required: ["idempotencyKey"]
+    not_applicable: ["optimisticVersion"]
+    idempotency_scope: "SCHEME_COLLECTION + command + actorUserId + idempotencyKey"
+  validate_create_preflight:
+    dto: "AssessmentSchemeDraftCreatePreflightRequest"
+    required: []
+    note: "Non-mutating create preflight; no idempotencyKey or optimisticVersion required."
+  validate_existing_draft_preflight:
+    dto: "AssessmentSchemeDraftValidateRequest"
+    required: ["optimisticVersion"]
+    note: "Non-mutating existing-DRAFT preflight; idempotencyKey is intentionally not required."
+  update_draft:
+    dto: "AssessmentSchemeDraftUpdateRequest"
+    required: ["idempotencyKey", "optimisticVersion"]
+    state_guard: "DRAFT only"
+  publish_scheme:
+    dto: "AssessmentSchemeCommandRequest"
+    required: ["idempotencyKey", "optimisticVersion"]
+    state_guard: "DRAFT -> ACTIVE"
+  copy_scheme_to_draft:
+    dto: "AssessmentSchemeCopyRequest"
+    required: ["idempotencyKey", "optimisticVersion"]
+    state_guard: "source status != ARCHIVED; ACTIVE source is copied into a new DRAFT with sourceTrace"
+  delete_draft:
+    dto: "AssessmentSchemeCommandRequest"
+    required: ["idempotencyKey", "optimisticVersion"]
+    state_guard: "DRAFT and hasBeenPublished == false"
+  archive_scheme:
+    dto: "AssessmentSchemeArchiveRequest"
+    required: ["reason", "idempotencyKey", "optimisticVersion"]
+    state_guard: "DRAFT|SUSPENDED|EXPIRED -> ARCHIVED; ACTIVE -> ARCHIVED remains unsupported"
+  deterministic_error_codes:
+    missing_or_invalid_metadata: "422 VALIDATION_ERROR or 422 COMMAND_METADATA_REQUIRED / COMMAND_METADATA_INVALID"
+    stale_optimistic_version: "409 VERSION_CONFLICT"
+    idempotency_payload_conflict: "409 IDEMPOTENCY_KEY_CONFLICT"
+    invalid_state_or_transition: "409 INVALID_STATE / INVALID_TRANSITION"
+
+deferred_api_groups:
+  - "P2 workflow route designer"
+  - "P2 scheduler runtime"
+  - "P2 simulation cockpit"
+  - "P2 external data collection/retry/export"
+  - "P2 notification read receipts"
+  - "P2 issue project tracker read model and overdue reminder command"
+  - "P2 issue analytics dashboard and PNG export"
+  - "P2 cycle cancellation command after source-backed action/test/audit semantics are defined"
+
+action_to_api_mapping:
+  create_indicator_draft: "P1-API-INDICATOR-CREATE"
+  update_indicator_version_draft: "P1-API-INDICATOR-UPDATE-DRAFT"
+  validate_scoring_rule: "P1-API-INDICATOR-VALIDATE-SCORING"
+  publish_indicator_version: "P1-API-INDICATOR-PUBLISH"
+  archive_indicator_version: "P1-API-INDICATOR-ARCHIVE"
+  clone_indicator_version: "P1-API-INDICATOR-CLONE"
+  view_scheme_detail: "P1-API-SCHEME-DETAIL"
+  validate_scheme_create: "P1-API-SCHEME-VALIDATE-CREATE"
+  validate_scheme_draft: "P1-API-SCHEME-VALIDATE-DRAFT"
+  create_scheme_draft: "P1-API-SCHEME-CREATE"
+  update_scheme_draft: "P1-API-SCHEME-UPDATE-DRAFT"
+  copy_scheme: "P1-API-SCHEME-COPY"
+  copy_scheme_to_draft: "P1-API-SCHEME-COPY"
+  delete_never_published_scheme_draft: "P1-API-SCHEME-DELETE-DRAFT"
+  publish_scheme: "P1-API-SCHEME-PUBLISH"
+  archive_scheme: "P1-API-SCHEME-ARCHIVE"
+  create_cycle_from_scheme: "P1-API-CYCLE-CREATE"
+  select_cycle_targets: "P1-API-CYCLE-CREATE"
+  dispatch_cycle: "P1-API-CYCLE-DISPATCH"
+  send_cycle_reminder: "P1-API-CYCLE-REMINDER"
+  publish_cycle_results: "P1-API-CYCLE-PUBLISH-RESULTS"
+  archive_cycle: "P1-API-CYCLE-ARCHIVE"
+  save_reporting_draft: "P1-API-REPORTING-SAVE-DRAFT"
+  submit_reporting: "P1-API-REPORTING-SUBMIT"
+  recall_reporting_before_review: "P1-API-REPORTING-RECALL"
+  import_ledger_entry_to_reporting: "P1-API-REPORTING-IMPORT-LEDGER"
+  create_daily_ledger_entry: "P1-API-DAILY-LEDGER-CREATE"
+  update_daily_ledger_entry: "P1-API-DAILY-LEDGER-UPDATE"
+  soft_delete_daily_ledger_entry: "P1-API-DAILY-LEDGER-SOFT-DELETE"
+  start_assessment_review: "P1-API-REVIEW-START"
+  save_review_comment: "P1-API-REVIEW-SAVE"
+  adjust_review_score: "P1-API-REVIEW-SAVE"
+  approve_assessment_review: "P1-API-REVIEW-DECISION"
+  return_assessment_reporting: "P1-API-REVIEW-DECISION"
+  generate_assessment_results: "P1-API-RESULT-GENERATE"
+  publish_assessment_results: "P1-API-CYCLE-PUBLISH-RESULTS"
+  confirm_assessment_result: "P1-API-RESULT-CONFIRM"
+  submit_score_appeal: "P1-API-SCORE-APPEAL-SUBMIT"
+  decide_score_appeal: "P1-API-SCORE-APPEAL-DECISION"
+  finalize_assessment_result: "P1-API-RESULT-FINALIZE"

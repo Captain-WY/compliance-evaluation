@@ -1,0 +1,466 @@
+schema_version: 1
+status: "frozen"
+updated_at: "2026-05-19"
+
+contract_id: "P0-BACKEND-API"
+freeze_gate: "BACKEND-FREEZE-001"
+frozen: true
+frozen_at: "2026-05-19"
+freeze_decision: "BACKEND-FREEZE-001 approved after second-round frontend audit"
+
+source_assets:
+  - "docs/ai-first/specs/frontend-inventory.yaml"
+  - "docs/ai-first/specs/traceability.yaml"
+  - "docs/ai-first/specs/routing-contract.yaml"
+  - "docs/ai-first/specs/p0-action-contract.yaml"
+  - "docs/ai-first/specs/error-model.yaml"
+
+global_conventions:
+  api_prefix: "/api"
+  frontend_public_prefix: "/compliance"
+  auth_header: "Authorization: Bearer <token>"
+  response_envelope:
+    success: "{ data, requestId }"
+    error: "{ code, message, details, requestId }"
+  pagination:
+    request_fields: ["page", "pageSize", "sort"]
+    response_fields: ["items", "page", "pageSize", "total"]
+  id_style:
+    canonical_backend_ids_are_domain_prefixed: true
+    frontend_compatibility_note: "Frontend MVP commonly uses `id`; API DTOs should expose domain-prefixed IDs for nested clarity and may include `id` as a compatibility alias in frontend view DTOs."
+    public_dto_fields:
+      - "taskId"
+      - "inspectionPlanId"
+      - "branchId"
+      - "requirementId"
+      - "fileId"
+      - "evidenceSubmissionId"
+      - "issueId"
+      - "appealId"
+      - "rectificationId"
+
+accepted_decisions:
+  ROUTE-DETAIL-001: "Use REST-like detail routes from stage-a-review-route-api.md."
+  API-TASK-OPEN-001: "Task target resolution is read-only: GET /api/tasks/{taskId}/target."
+  API-EVIDENCE-UPLOAD-001: "Split file asset upload and evidence business submission."
+  AUDIT-P0-2026-05-19: "Apply p0-contract-vs-frontend audit findings: plan target mapping, lifecycle APIs, appeal list API, dictionary completeness, and explicit assessment exclusions."
+
+apis:
+  - id: "API-AUTH-LOGIN"
+    method: "POST"
+    path: "/api/auth/login"
+    priority: "P0"
+    request_dto: "LoginRequest"
+    response_dto: "AuthSessionResponse"
+    entities: ["AuthUser"]
+    permission: "anonymous"
+    errors: ["INVALID_CREDENTIALS", "DISABLED_USER", "AUTH_SERVICE_UNAVAILABLE"]
+    source_traces: ["TR-AUTH-LOGIN"]
+
+  - id: "API-AUTH-ME"
+    method: "GET"
+    path: "/api/auth/me"
+    priority: "P0"
+    request_dto: "CurrentUserQuery"
+    response_dto: "AuthUser"
+    entities: ["AuthUser"]
+    permission: "authenticated"
+    errors: ["UNAUTHORIZED"]
+    source_traces: ["TR-AUTH-LOGIN"]
+    dto_mapping:
+      canonical_id: "userId"
+      frontend_aliases: ["id"]
+      frontend_required_view_fields: ["title", "department", "organizationName", "defaultMenuId", "taskView", "avatarLabel"]
+      server_owned_fields: ["orgId", "roleIds"]
+
+  - id: "API-ORG-TREE"
+    method: "GET"
+    path: "/api/system/org-tree"
+    priority: "P0"
+    request_dto: "OrgTreeQuery"
+    response_dto: "OrgTree"
+    entities: ["OrgNode"]
+    permission: "PERM-SYSTEM-ADMIN or PERM-HQ-INSPECTION-MANAGE"
+    errors: ["FORBIDDEN"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-PERSONNEL-LIST"
+    method: "GET"
+    path: "/api/system/personnel"
+    priority: "P0"
+    request_dto: "PersonnelQuery"
+    response_dto: "PersonnelPage"
+    entities: ["Personnel", "OrgNode"]
+    permission: "PERM-SYSTEM-ADMIN"
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-ROLE-LIST"
+    method: "GET"
+    path: "/api/system/roles"
+    priority: "P0"
+    request_dto: "RoleQuery"
+    response_dto: "SystemRole[]"
+    entities: ["SystemRole"]
+    permission: "PERM-SYSTEM-ADMIN"
+    errors: ["FORBIDDEN"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-ROLE-ASSIGNMENT-LIST"
+    method: "GET"
+    path: "/api/system/role-assignments"
+    priority: "P0"
+    request_dto: "RoleAssignmentQuery"
+    response_dto: "RoleAssignment[]"
+    entities: ["RoleAssignment"]
+    permission: "PERM-SYSTEM-ADMIN"
+    errors: ["FORBIDDEN"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-ROLE-ASSIGNMENT-CREATE"
+    method: "POST"
+    path: "/api/system/role-assignments"
+    priority: "P0"
+    request_dto: "RoleAssignmentCreateRequest"
+    response_dto: "RoleAssignment"
+    entities: ["RoleAssignment", "SystemRole", "Personnel"]
+    permission: "PERM-SYSTEM-ADMIN"
+    errors: ["DUPLICATE_ASSIGNMENT", "INACTIVE_PERSONNEL", "FORBIDDEN"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-ROLE-ASSIGNMENT-DELETE"
+    method: "DELETE"
+    path: "/api/system/role-assignments/{assignmentId}"
+    priority: "P0"
+    request_dto: "RoleAssignmentDeleteRequest"
+    response_dto: "DeleteResult"
+    entities: ["RoleAssignment"]
+    permission: "PERM-SYSTEM-ADMIN"
+    errors: ["NOT_FOUND", "FORBIDDEN", "CONFLICT"]
+    source_traces: ["TR-SYSTEM-ROLE-ASSIGN"]
+
+  - id: "API-TASK-LIST"
+    method: "GET"
+    path: "/api/tasks"
+    priority: "P0"
+    request_dto: "TaskQuery"
+    response_dto: "UnifiedTaskPage"
+    entities: ["UnifiedTask"]
+    permission: "current user scope"
+    errors: ["UNAUTHORIZED", "FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-TASK-HQ-LIST", "TR-TASK-BRANCH-LIST"]
+
+  - id: "API-TASK-TARGET"
+    method: "GET"
+    path: "/api/tasks/{taskId}/target"
+    priority: "P0"
+    request_dto: "TaskTargetQuery"
+    response_dto: "UnifiedTaskActionTarget"
+    entities: ["UnifiedTask", "UnifiedTaskActionTarget"]
+    permission: "task owner or permitted reviewer"
+    mutates_state: false
+    errors: ["TASK_NOT_FOUND", "TARGET_ROUTE_NOT_SUPPORTED", "FORBIDDEN"]
+    source_traces: ["TR-TASK-BRANCH-LIST"]
+
+  - id: "API-INSPECTION-PLAN-LIST"
+    method: "GET"
+    path: "/api/inspection/plans"
+    priority: "P0"
+    request_dto: "InspectionPlanQuery"
+    response_dto: "InspectionPlanPage"
+    entities: ["InspectionPlan"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    filters: ["year", "type", "status", "phase", "keyword", "targetOrgId", "targetDept"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-INSPECTION-PLAN-QUERY"]
+    dto_mapping:
+      targetDept: "frontend display/filter field; backend resolves to targetOrgId/targetOrgIds when possible"
+
+  - id: "API-INSPECTION-PLAN-CREATE"
+    method: "POST"
+    path: "/api/inspection/plans"
+    priority: "P0"
+    request_dto: "InspectionPlanCreateRequest"
+    response_dto: "InspectionPlan"
+    entities: ["InspectionPlan"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    errors: ["MISSING_TARGET_ORG", "INVALID_DATE_RANGE", "DUPLICATE_PLAN_CODE", "INVALID_PLAN_ATTACHMENT_TYPE", "DUPLICATE_PLAN_ATTACHMENT_TYPE", "INVALID_PLAN_ATTACHMENT_FILE", "FILE_ASSET_NOT_FOUND", "FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-INSPECTION-PLAN-CREATE"]
+    dto_mapping:
+      canonical_target_field: "targetOrgIds"
+      frontend_current_field: "targetDept"
+      cardinality: "one_or_many"
+      rule: "Initial frontend wizard selects one display target; backend contract supports one or more targetOrgIds and may return targetDeptLabel for display compatibility."
+      leader_mapping: "leaderUserId/teamMemberUserIds are canonical; leader/teamMembers display names may be returned in frontend view DTOs."
+      confidentiality_mapping: "SIT-IPC-CONFIDENTIALITY-02 adds optional confidentialityLevel from inspection_confidentiality_level; create omission defaults to NORMAL, but historical missing rows remain null/empty in read models."
+      attachment_mapping: "SIT-IPC-ATTACHMENT-CONFIG-01 accepts optional files[] with attachmentType from inspection_plan_attachment_type and fileId from a real FileAsset uploaded by the same user. Supported codes: INSPECTION_NOTICE, ONSITE_INSPECTION_SCHEME, WORKING_PAPER_TEMPLATE, OTHER. All are required=false unless a future human decision changes the configuration."
+
+  - id: "API-INSPECTION-PLAN-UPDATE"
+    method: "PATCH"
+    path: "/api/inspection/plans/{inspectionPlanId}"
+    priority: "P0"
+    request_dto: "InspectionPlanUpdateRequest"
+    response_dto: "InspectionPlan"
+    entities: ["InspectionPlan"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    mutates_state: true
+    errors: ["NOT_FOUND", "FORBIDDEN", "INVALID_DATE_RANGE", "PLAN_NOT_EDITABLE", "VALIDATION_ERROR"]
+    source_traces: ["TR-INSPECTION-PLAN-CREATE", "TR-INSPECTION-PLAN-QUERY"]
+    notes:
+      - "Supports frontend draft-save/edit behavior before launch or while plan remains editable."
+      - "SIT-IPC-CONFIDENTIALITY-02 allows confidentialityLevel updates only through the existing editable guard; values must be ASCII codes from inspection_confidentiality_level."
+
+  - id: "API-INSPECTION-PLAN-TRANSITION"
+    method: "POST"
+    path: "/api/inspection/plans/{inspectionPlanId}/transitions"
+    priority: "P0"
+    request_dto: "InspectionPlanTransitionRequest"
+    response_dto: "InspectionPlan"
+    entities: ["InspectionPlan", "IntegrationEvent"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    mutates_state: true
+    allowed_actions: ["submit_approval", "approve", "launch", "suspend", "resume", "terminate", "complete"]
+    errors: ["NOT_FOUND", "FORBIDDEN", "INVALID_TRANSITION", "TERMINATE_REASON_REQUIRED", "CONFLICT"]
+    source_traces: ["TR-INSPECTION-PLAN-CREATE", "TR-EXECUTION-REMINDER"]
+    notes:
+      - "Added from frontend audit: InspectionPlanHeader exposes suspend/resume/terminate controls."
+
+  - id: "API-INSPECTION-PLAN-DETAIL"
+    method: "GET"
+    path: "/api/inspection/plans/{inspectionPlanId}"
+    priority: "P0"
+    request_dto: "InspectionPlanDetailQuery"
+    response_dto: "InspectionPlanDetail"
+    entities: ["InspectionPlan"]
+    permission: "inspection hq or targeted branch"
+    errors: ["NOT_FOUND", "FORBIDDEN"]
+    source_traces: ["TR-INSPECTION-PLAN-QUERY"]
+    public_route: "/compliance/hq/inspection/plans/:inspectionPlanId"
+    dto_mapping:
+      confidentialityLevel: "Optional ASCII code from inspection_confidentiality_level."
+      confidentialityLabel: "Display label resolved from the dictionary; null when historical rows have no confidentialityLevel."
+      files: "Plan-scoped creation attachments. Each item returns attachmentType, attachmentKey, attachmentLabel, required, bindingTargetType, businessStage, maintenance, fileId, fileName, contentType, fileSize, scanStatus, uploadedBy, uploadedAt, boundBy, and boundAt."
+
+  - id: "API-INSPECTION-EXECUTION-DETAIL"
+    method: "GET"
+    path: "/api/inspection/plans/{inspectionPlanId}/execution"
+    priority: "P0"
+    request_dto: "InspectionExecutionQuery"
+    response_dto: "InspectionExecutionWorkspace"
+    entities: ["InspectionPlan", "EvidenceSubmission", "WorkingPaper", "ExecutionStats"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    errors: ["NOT_FOUND", "FORBIDDEN"]
+    source_traces: ["TR-EXECUTION-REMINDER"]
+    public_route: "/compliance/hq/inspection/execution/:inspectionPlanId/branches/:branchId"
+
+  - id: "API-INSPECTION-EXECUTION-SUMMARY"
+    method: "GET"
+    path: "/api/inspection/execution/summary"
+    priority: "P0"
+    request_dto: "InspectionExecutionSummaryQuery"
+    response_dto: "InspectionExecutionSummary"
+    entities: ["InspectionPlan", "EvidenceSubmission", "WorkingPaper", "ExecutionStats"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    filters: ["year", "status", "phase", "businessLine", "targetOrgId"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-EXECUTION-REMINDER"]
+    notes:
+      - "Read-model API for execution monitor cards/flight board. It must not create durable write entities."
+
+  - id: "API-EVIDENCE-REQUIREMENT-LIST"
+    method: "GET"
+    path: "/api/inspection/plans/{inspectionPlanId}/evidence-requirements"
+    priority: "P0"
+    request_dto: "EvidenceRequirementQuery"
+    response_dto: "EvidenceRequirement[]"
+    entities: ["EvidenceRequirement"]
+    permission: "inspection hq or targeted branch"
+    errors: ["NOT_FOUND", "FORBIDDEN"]
+    source_traces: ["TR-EVIDENCE-UPLOAD"]
+    public_route: "/compliance/branch/inspection/materials/:inspectionPlanId/requirements/:requirementId"
+
+  - id: "API-FILE-UPLOAD"
+    method: "POST"
+    path: "/api/files"
+    priority: "P0"
+    request_dto: "FileUploadRequest"
+    response_dto: "FileAsset"
+    entities: ["FileAsset"]
+    permission: "authenticated scoped uploader"
+    errors: ["FILE_TYPE_INVALID", "FILE_SIZE_EXCEEDED", "UPLOAD_FAILED", "FORBIDDEN"]
+    source_traces: ["TR-EVIDENCE-UPLOAD", "TR-FACT-APPEAL", "TR-RECTIFICATION-SUBMIT"]
+    file_policy:
+      allowed_mime_types: ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/png", "image/jpeg", "text/plain"]
+      allowed_extensions_display: [".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg", ".txt"]
+      max_file_size_bytes_default: 104857600
+      scan_status_initial: "SCAN_DEFERRED"
+
+  - id: "API-EVIDENCE-SUBMISSION-CREATE"
+    method: "POST"
+    path: "/api/inspection/evidence-submissions"
+    priority: "P0"
+    request_dto: "EvidenceSubmissionCreateRequest"
+    response_dto: "EvidenceSubmission"
+    entities: ["EvidenceSubmission", "FileAsset"]
+    permission: "targeted branch"
+    errors: ["DEADLINE_PASSED", "REQUIREMENT_NOT_FOUND", "FILE_ASSET_NOT_FOUND", "FORBIDDEN"]
+    source_traces: ["TR-EVIDENCE-UPLOAD"]
+
+  - id: "API-EKP-REMINDER-CREATE"
+    method: "POST"
+    path: "/api/integrations/ekp/reminders"
+    priority: "P0"
+    request_dto: "EkpReminderCreateRequest"
+    response_dto: "IntegrationEvent"
+    entities: ["IntegrationEvent"]
+    permission: "PERM-HQ-INSPECTION-MANAGE or PERM-ISSUE-HQ"
+    errors: ["INTEGRATION_UNAVAILABLE", "DUPLICATE_REMINDER", "FORBIDDEN"]
+    source_traces: ["TR-EXECUTION-REMINDER"]
+
+  - id: "API-FACT-ISSUE-LIST"
+    method: "GET"
+    path: "/api/inspection/issues"
+    priority: "P0"
+    request_dto: "InspectionIssueQuery"
+    response_dto: "InspectionIssuePage"
+    entities: ["InspectionIssue"]
+    permission: "PERM-HQ-INSPECTION-MANAGE or targeted branch"
+    filters: ["status", "inspectionPlanId", "branchId", "keyword"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-FACT-CONFIRM", "TR-FACT-APPEAL"]
+
+  - id: "API-FACT-CONFIRM"
+    method: "POST"
+    path: "/api/inspection/issues/{issueId}/confirmations"
+    priority: "P0"
+    request_dto: "FactConfirmationRequest"
+    response_dto: "FactConfirmation"
+    entities: ["InspectionIssue", "FactConfirmation"]
+    permission: "targeted branch"
+    errors: ["APPEAL_DEADLINE_CLOSED", "ISSUE_NOT_ASSIGNED_TO_BRANCH", "FORBIDDEN"]
+    source_traces: ["TR-FACT-CONFIRM"]
+
+  - id: "API-APPEAL-SUBMIT"
+    method: "POST"
+    path: "/api/inspection/issues/{issueId}/appeals"
+    priority: "P0"
+    request_dto: "AppealSubmitRequest"
+    response_dto: "IssueAppeal"
+    entities: ["IssueAppeal", "InspectionIssue", "FileAsset"]
+    permission: "targeted branch"
+    errors: ["MISSING_REASON", "DEADLINE_PASSED", "DUPLICATE_ACTIVE_APPEAL", "FORBIDDEN"]
+    source_traces: ["TR-FACT-APPEAL"]
+    public_route: "/compliance/branch/inspection/issues/:issueId/appeal"
+
+  - id: "API-APPEAL-LIST"
+    method: "GET"
+    path: "/api/inspection/appeals"
+    priority: "P0"
+    request_dto: "AppealQuery"
+    response_dto: "IssueAppealPage"
+    entities: ["IssueAppeal", "InspectionIssue", "AdjudicationDecision"]
+    permission: "PERM-HQ-ADJUDICATION"
+    filters: ["status", "inspectionPlanId", "branchId", "keyword"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-ADJUDICATION-DECIDE"]
+    public_route: "/compliance/hq/inspection/adjudication"
+
+  - id: "API-ADJUDICATION-DECIDE"
+    method: "POST"
+    path: "/api/inspection/appeals/{appealId}/decision"
+    priority: "P0"
+    request_dto: "AdjudicationDecisionRequest"
+    response_dto: "AdjudicationDecision"
+    entities: ["IssueAppeal", "AdjudicationDecision", "InspectionIssue"]
+    permission: "PERM-HQ-INSPECTION-MANAGE"
+    errors: ["APPEAL_ALREADY_DECIDED", "DECISION_REASON_MISSING", "FORBIDDEN"]
+    source_traces: ["TR-ADJUDICATION-DECIDE"]
+    public_route: "/compliance/hq/inspection/appeals/:appealId"
+
+  - id: "API-ISSUE-LIST"
+    method: "GET"
+    path: "/api/issues"
+    priority: "P0"
+    request_dto: "IssueQuery"
+    response_dto: "ComplianceIssuePage"
+    entities: ["ComplianceIssue"]
+    permission: "issue hq or scoped branch"
+    filters: ["status", "riskLevel", "responsibleOrgId", "source", "businessLine", "dueDateRange", "keyword"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-ISSUE-HUB-QUERY"]
+
+  - id: "API-ISSUE-DETAIL"
+    method: "GET"
+    path: "/api/issues/{issueId}"
+    priority: "P0"
+    request_dto: "IssueDetailQuery"
+    response_dto: "ComplianceIssueDetail"
+    entities: ["ComplianceIssue", "RectificationRecord"]
+    permission: "issue hq or scoped branch"
+    errors: ["NOT_FOUND", "FORBIDDEN"]
+    source_traces: ["TR-ISSUE-HUB-QUERY"]
+    public_route: "/compliance/hq/issues/:issueId"
+
+  - id: "API-ISSUE-SUPERVISE"
+    method: "POST"
+    path: "/api/issues/{issueId}/supervision-events"
+    priority: "P0"
+    request_dto: "IssueSupervisionEventCreateRequest"
+    response_dto: "IssueSupervisionEvent"
+    entities: ["ComplianceIssue", "IntegrationEvent", "UnifiedTask"]
+    permission: "PERM-ISSUE-HQ or PERM-HQ-INSPECTION-MANAGE"
+    errors: ["ISSUE_NOT_FOUND", "DUPLICATE_SUPERVISION", "FORBIDDEN"]
+    source_traces: ["TR-ISSUE-SUPERVISE"]
+
+  - id: "API-RECTIFICATION-LIST"
+    method: "GET"
+    path: "/api/rectifications"
+    priority: "P0"
+    request_dto: "RectificationQuery"
+    response_dto: "RectificationRecordPage"
+    entities: ["RectificationRecord"]
+    permission: "responsible branch or issue hq"
+    filters: ["status", "branchId", "issueId", "dueDateRange"]
+    errors: ["FORBIDDEN", "VALIDATION_ERROR"]
+    source_traces: ["TR-RECTIFICATION-SUBMIT", "TR-RECTIFICATION-VERIFY"]
+
+  - id: "API-RECTIFICATION-SUBMIT"
+    method: "POST"
+    path: "/api/rectifications/{rectificationId}/feedback"
+    priority: "P0"
+    request_dto: "RectificationFeedbackSubmitRequest"
+    response_dto: "RectificationRecord"
+    entities: ["RectificationRecord", "RectificationFeedback", "FileAsset"]
+    permission: "responsible branch"
+    errors: ["MISSING_FEEDBACK", "FILE_ASSET_NOT_FOUND", "RECORD_ALREADY_CLOSED", "FORBIDDEN"]
+    source_traces: ["TR-RECTIFICATION-SUBMIT"]
+    public_route: "/compliance/branch/issues/rectifications/:rectificationId"
+
+  - id: "API-RECTIFICATION-VERIFY"
+    method: "POST"
+    path: "/api/rectifications/{rectificationId}/verification"
+    priority: "P0"
+    request_dto: "RectificationVerificationRequest"
+    response_dto: "RectificationRecord"
+    entities: ["RectificationRecord", "ComplianceIssue"]
+    permission: "PERM-ISSUE-HQ or PERM-HQ-INSPECTION-MANAGE"
+    errors: ["RECORD_NOT_FOUND", "REJECT_REASON_MISSING", "RECORD_NOT_PENDING_VERIFICATION", "FORBIDDEN"]
+    source_traces: ["TR-RECTIFICATION-VERIFY"]
+    public_route: "/compliance/hq/issues/:issueId"
+
+open_items:
+  - id: "BACKEND-FREEZE-001"
+    status: "approved"
+    impact: "P0 API contract frozen for implementation work-packet split."
+  - id: "AUDIT-P0-C1-TARGET-MAPPING"
+    status: "contract_updated"
+    impact: "targetDept display field is mapped to canonical targetOrgIds; backend supports one or many targets."
+  - id: "AUDIT-P0-C2-PLAN-LIFECYCLE"
+    status: "contract_updated"
+    impact: "Plan update and lifecycle transition APIs added."
+  - id: "AUDIT-P0-H3-APPEAL-LIST"
+    status: "contract_updated"
+    impact: "Appeal list API added for adjudication dashboard."
+  - id: "ROUTE-IMPLEMENTATION-001"
+    status: "implementation_constraint"
+    impact: "Frontend true route rendering must be implemented later for production-grade deep links."

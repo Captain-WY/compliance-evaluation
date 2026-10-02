@@ -6,7 +6,7 @@ const apiClient=axios.create({baseURL:'/api/v1',timeout:30000,adapter:async(conf
  const path=config.url?.startsWith('/api/')?config.url:`/api/v1${config.url}`;
  const url=new URL(path,window.location.origin);Object.entries(config.params||{}).forEach(([k,v])=>{if(v!=null)url.searchParams.set(k,String(v));});
  const response=await requestRaw(url.pathname+url.search,{method:config.method?.toUpperCase(),body:config.data,headers:config.headers as unknown as HeadersInit});
- const data=config.responseType==='blob'?await response.blob():await response.json();
+ const data=config.responseType==='blob'?await response.blob():await response.json().catch(()=>{if(response.ok)throw new Error('接口返回格式错误');return {message:`请求失败（HTTP ${response.status}）`};});
  const result={data,status:response.status,statusText:response.statusText,headers:new AxiosHeaders(),config};
  if(!response.ok)throw new AxiosError(data.message||data.detail||'请求失败',String(response.status),config,null,result);
  return result;

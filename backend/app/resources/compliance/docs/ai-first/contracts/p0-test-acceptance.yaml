@@ -1,0 +1,173 @@
+schema_version: 1
+status: "frozen"
+updated_at: "2026-05-19"
+
+contract_id: "P0-BACKEND-TEST-ACCEPTANCE"
+freeze_gate: "BACKEND-FREEZE-001"
+frozen: true
+frozen_at: "2026-05-19"
+freeze_decision: "BACKEND-FREEZE-001 approved after second-round frontend audit"
+
+test_strategy:
+  levels:
+    - "contract_schema_tests"
+    - "api_integration_tests"
+    - "permission_scope_tests"
+    - "state_machine_tests"
+    - "frontend_contract_e2e_tests"
+  seed_policy:
+    source: "docs/ai-first/specs/seed-scenarios.yaml"
+    note: "Use accepted WLZQ baseline and user-supplied 69 branch offices; do not invent additional official-looking rows."
+
+acceptance_scenarios:
+  - id: "AC-P0-AUTH-001"
+    name: "Login returns JWT-compatible session and permitted menus"
+    priority: "P0"
+    actors: ["anonymous"]
+    apis: ["API-AUTH-LOGIN", "API-AUTH-ME"]
+    assertions:
+      - "Valid credentials return AuthSessionResponse with token and AuthUser."
+      - "AuthUser response includes frontend-required view fields: title, department, organizationName, defaultMenuId, taskView, avatarLabel."
+      - "AuthUser response maps canonical userId to frontend-compatible id."
+      - "Invalid credentials return INVALID_CREDENTIALS."
+      - "Disabled users return DISABLED_USER."
+      - "Backend does not trust frontend permittedMenuIds for authorization."
+
+  - id: "AC-P0-PERM-001"
+    name: "System admin manages role assignments"
+    priority: "P0"
+    actors: ["ROLE_SYSTEM_ADMIN"]
+    apis: ["API-ORG-TREE", "API-PERSONNEL-LIST", "API-ROLE-LIST", "API-ROLE-ASSIGNMENT-CREATE", "API-ROLE-ASSIGNMENT-DELETE"]
+    assertions:
+      - "Org tree supports branch office, branch company, line HQ, compliance department, and compliance director layers."
+      - "Creating duplicate assignment returns DUPLICATE_ASSIGNMENT."
+      - "Deleting missing assignment returns NOT_FOUND."
+      - "All create/delete operations are audit-recordable."
+
+  - id: "AC-P0-TASK-001"
+    name: "Task list and target resolution are scoped and read-only"
+    priority: "P0"
+    actors: ["ROLE_COMPLIANCE_MANAGER", "ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    apis: ["API-TASK-LIST", "API-TASK-TARGET"]
+    assertions:
+      - "HQ user sees HQ-scoped tasks."
+      - "Branch user sees only organization-scoped tasks."
+      - "GET /api/tasks/{taskId}/target returns UnifiedTaskActionTarget."
+      - "Resolving target does not mark task read, done, or completed."
+      - "Unsupported target route returns TARGET_ROUTE_NOT_SUPPORTED."
+
+  - id: "AC-P0-INSPECTION-PLAN-001"
+    name: "HQ creates and queries inspection plan"
+    priority: "P0"
+    actors: ["ROLE_INSPECTION_LEAD"]
+    apis: ["API-INSPECTION-PLAN-LIST", "API-INSPECTION-PLAN-CREATE", "API-INSPECTION-PLAN-UPDATE", "API-INSPECTION-PLAN-TRANSITION", "API-INSPECTION-PLAN-DETAIL"]
+    assertions:
+      - "Plan draft can be created with one or more target organizations and planned period."
+      - "Frontend targetDept display value is resolvable to canonical targetOrgIds or returned as targetDeptLabel when unresolved."
+      - "Plan draft can be updated before launch."
+      - "Lifecycle transition API supports submit_approval, approve, launch, suspend, resume, terminate, and complete according to state-machine guards."
+      - "Terminate requires a non-empty reason."
+      - "Invalid date range returns INVALID_DATE_RANGE."
+      - "Plan detail is reachable through /compliance/hq/inspection/plans/:inspectionPlanId deep link."
+      - "Plan starts in PLAN_DRAFT or equivalent draft lifecycle state."
+
+  - id: "AC-P0-INSPECTION-EXECUTION-SUMMARY-001"
+    name: "HQ views execution monitor summary"
+    priority: "P0"
+    actors: ["ROLE_INSPECTION_LEAD", "ROLE_COMPLIANCE_MANAGER"]
+    apis: ["API-INSPECTION-EXECUTION-SUMMARY", "API-INSPECTION-EXECUTION-DETAIL"]
+    assertions:
+      - "Execution summary returns read-model metrics for monitor cards and flight board."
+      - "Summary query does not create or mutate durable inspection entities."
+      - "Execution detail remains plan-scoped."
+
+  - id: "AC-P0-EVIDENCE-001"
+    name: "Branch uploads file asset and submits evidence"
+    priority: "P0"
+    actors: ["ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    apis: ["API-EVIDENCE-REQUIREMENT-LIST", "API-FILE-UPLOAD", "API-EVIDENCE-SUBMISSION-CREATE"]
+    assertions:
+      - "Requirement list is scoped to targeted branch and inspection plan."
+      - "File upload creates FileAsset and does not itself advance EvidenceSubmission status."
+      - "Evidence submission binds existing fileIds to requirementId."
+      - "Submitting after deadline returns DEADLINE_PASSED."
+      - "Unknown fileId returns FILE_ASSET_NOT_FOUND."
+
+  - id: "AC-P0-FACT-APPEAL-001"
+    name: "Branch confirms fact or submits appeal"
+    priority: "P0"
+    actors: ["ROLE_BRANCH_COMPLIANCE_OFFICER"]
+    apis: ["API-FACT-CONFIRM", "API-APPEAL-SUBMIT", "API-FILE-UPLOAD"]
+    assertions:
+      - "No-objection confirmation creates FactConfirmation."
+      - "Appeal requires reason and can attach FileAsset IDs."
+      - "Duplicate active appeal returns DUPLICATE_ACTIVE_APPEAL."
+      - "Appeal workspace deep link uses /compliance/branch/inspection/issues/:issueId/appeal."
+
+  - id: "AC-P0-ADJUDICATION-001"
+    name: "HQ adjudicates appeal"
+    priority: "P0"
+    actors: ["ROLE_INSPECTION_LEAD", "ROLE_COMPLIANCE_MANAGER"]
+    apis: ["API-APPEAL-LIST", "API-ADJUDICATION-DECIDE"]
+    assertions:
+      - "HQ can list pending appeals by status, inspectionPlanId, branchId, and keyword."
+      - "Decision supports ADOPTED and REJECTED outcomes."
+      - "Decision reason is required."
+      - "Decided appeal cannot be decided again."
+      - "HQ adjudication deep link uses /compliance/hq/inspection/appeals/:appealId."
+
+  - id: "AC-P0-ISSUE-001"
+    name: "HQ queries and supervises issue"
+    priority: "P0"
+    actors: ["ROLE_COMPLIANCE_MANAGER", "ROLE_INSPECTION_LEAD"]
+    apis: ["API-ISSUE-LIST", "API-ISSUE-DETAIL", "API-ISSUE-SUPERVISE"]
+    assertions:
+      - "Issue list filters status, risk level, responsible org, source, business line, due date, and keyword."
+      - "Issue detail deep link uses /compliance/hq/issues/:issueId."
+      - "Supervision event is persisted and may create IntegrationEvent."
+      - "Duplicate supervision can return DUPLICATE_SUPERVISION."
+
+  - id: "AC-P0-RECTIFICATION-001"
+    name: "Branch submits rectification and HQ verifies"
+    priority: "P0"
+    actors: ["ROLE_BRANCH_COMPLIANCE_OFFICER", "ROLE_COMPLIANCE_MANAGER"]
+    apis: ["API-RECTIFICATION-LIST", "API-RECTIFICATION-SUBMIT", "API-RECTIFICATION-VERIFY", "API-FILE-UPLOAD"]
+    state_machine: "SM-ISSUE-RECTIFICATION"
+    assertions:
+      - "Branch list is organization-scoped."
+      - "Feedback submission moves status to PENDING_VERIFICATION."
+      - "HQ approve moves status to CLOSED."
+      - "HQ reject requires rejectReason and moves status to VERIFICATION_REJECTED."
+      - "Closed record cannot be submitted again."
+
+  - id: "AC-P0-ERROR-001"
+    name: "Common error model"
+    priority: "P0"
+    apis: ["all"]
+    assertions:
+      - "401 returns UNAUTHORIZED."
+      - "403 returns FORBIDDEN."
+      - "404 returns NOT_FOUND."
+      - "Validation failure returns VALIDATION_ERROR with details[].field and details[].reason."
+      - "State conflict returns CONFLICT or domain-specific business code."
+
+frontend_contract_checks:
+  - id: "FE-CONTRACT-ROUTE-001"
+    description: "Backend-generated deep links must use accepted /compliance public paths even before frontend true-routing implementation is completed."
+  - id: "FE-CONTRACT-MOCK-001"
+    description: "Frontend mock API facade names should map cleanly to P0 API contract IDs."
+  - id: "FE-CONTRACT-DTO-MAPPING-001"
+    description: "Implementation must map frontend generic id/display fields to backend canonical IDs and return view fields required by the current frontend."
+  - id: "FE-CONTRACT-DICTIONARY-001"
+    description: "All P0 and guardrail enum values from frontend types/enums must be represented in contract dictionaries or explicitly deferred."
+
+open_items:
+  - id: "BACKEND-FREEZE-001"
+    status: "approved"
+    acceptance: "P0 contract freeze approved after second-round audit."
+  - id: "SEED-FINAL-001"
+    status: "pending_human_decision"
+    acceptance: "Final seed package may remain draft while P0 API/entity contract freezes, as long as seed limitations are documented."
+  - id: "AUDIT-P0-INLINE-MOCK-001"
+    status: "quality_debt"
+    acceptance: "Remaining inline mock data in InspectionExecutionMonitor, BranchFactConfirmation, and AdjudicationDashboard should be migrated before frontend/backend integration hardening, but does not block conditional backend contract freeze if facts are explicitly captured."
