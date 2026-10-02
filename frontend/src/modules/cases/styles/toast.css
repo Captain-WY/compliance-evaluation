@@ -1,0 +1,17 @@
+/**
+ * Standalone Toast CSS
+ * Only adjusts the close button placement to the right edge (Standard UI practice).
+ * Avoids interfering with Sonner's beautiful "richColors" default styling.
+ */
+
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 0.5rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border: none !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}

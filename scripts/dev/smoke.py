@@ -104,6 +104,29 @@ def main():
         assert any(r["draft_id"] == state["draft"] for r in rows(smoke.request("POST", "/api/bff/v1/cases/drafts/list", {"pagination": {"page": 1, "size": 100}}))), "Case draft missing"
     smoke.check("case draft saved and read back", business_data)
 
+    def case_scope():
+        if not args.verify_existing:
+            state["case"] = unwrap(smoke.request("POST", "/api/bff/v1/cases/create", {"case_name": state["prefix"], "case_type_code": "CIVIL_LITIGATION"}))["case_id"]
+            STATE.write_text(json.dumps(state), encoding="utf-8")
+        smoke.request("POST", "/api/bff/v1/cases/detail/sidebar", {"case_id": state["case"]})
+        for role in ("branch_business", "external_lawyer"):
+            smoke.request("POST", "/api/bff/v1/cases/detail/sidebar", {"case_id": state["case"]}, role=role, expected=(403, 404))
+    smoke.check("case detail and nonmember access rejected", case_scope)
+
+    def clue_scope():
+        if not args.verify_existing:
+            state["hq_clue"] = unwrap(smoke.request("POST", "/api/bff/v1/clues/create", {"clue_title": state["prefix"] + "-HQ", "source_type": "MANUAL"}))["clue_id"]
+            state["branch_clue"] = unwrap(smoke.request("POST", "/api/bff/v1/clues/create", {"clue_title": state["prefix"] + "-BRANCH", "source_type": "MANUAL"}, role="branch_business"))["clue_id"]
+            STATE.write_text(json.dumps(state), encoding="utf-8")
+        result = rows(smoke.request("POST", "/api/bff/v1/clues/list", {"keyword": state["prefix"]}, role="branch_business"))
+        ids = {item["clue_id"] for item in result}
+        assert state["branch_clue"] in ids and state["hq_clue"] not in ids, "Clue actor isolation failed"
+        smoke.request("POST", "/api/bff/v1/clues/update", {"clue_id": state["hq_clue"], "clue_title": "DENIED"}, role="branch_business", expected=(403, 404))
+    smoke.check("branch clue own read and foreign write rejection", clue_scope)
+    smoke.check("lawyer portal initialized", lambda: smoke.request("POST", "/api/bff/v1/vendor-portal/summary", {}, role="external_lawyer"))
+
+
+
     def inspection():
         if not args.verify_existing:
             me = unwrap(smoke.request("GET", "/api/platform/auth/me"))
@@ -135,6 +158,12 @@ def main():
             assert state["prefix"] + "-updated" in json.dumps(smoke.request("GET", path)), "Shared dictionary missing in business reader"
         STATE.write_text(json.dumps(state), encoding="utf-8")
     smoke.check("common dictionary create update and both business readers", dictionary)
+
+    def protected_dictionary():
+        protected = next(r for r in rows(smoke.request("GET", "/api/platform/dictionaries")) if r["protected"])
+        smoke.request("PATCH", "/api/platform/dictionaries/" + protected["id"], {"namespace": protected["namespace"], "dict_type": protected["dictType"], "dict_code": protected["dictCode"] + "-DENIED", "dict_label": protected["dictLabel"]}, expected=(403,))
+    smoke.check("protected dictionary code change rejected", protected_dictionary)
+
 
     def file_roundtrip():
         content = (state["prefix"] + " attachment roundtrip").encode()

@@ -1,0 +1,191 @@
+[
+  {
+    "id": "M0-ROUTE-001",
+    "source": "/dispatch",
+    "target": "/assessments/hq-workflow-center?tab=archived",
+    "gap": false,
+    "parameters": "Preserve tab=archived. Dashboard currently defaults to active; migration must explicitly hydrate archived. No instanceId needed for archive list; never carry old detail id as a selected organization."
+  },
+  {
+    "id": "M0-ROUTE-002",
+    "source": "/dispatch",
+    "target": "/assessments/hq-workflow-center?tab=archived",
+    "gap": false,
+    "parameters": "Preserve tab=archived. Dashboard currently defaults to active; migration must explicitly hydrate archived. No instanceId needed for archive list; never carry old detail id as a selected organization."
+  },
+  {
+    "id": "M0-ROUTE-003",
+    "source": "/branch-assessment",
+    "target": "/assessments/branch-reporting",
+    "gap": false,
+    "parameters": "Legacy URL has no ID. TASK-BR-001 and sourceId ASSESS-2026Q1 are mock task/context IDs, not proven reporting_task_id. Preserve context if available; resolve through task/source map and organization scope before opening a form. Otherwise show authorized task list."
+  },
+  {
+    "id": "M0-ROUTE-004",
+    "source": "/branch-working-papers",
+    "target": "/inspections/branch-upload",
+    "gap": false,
+    "parameters": "Legacy URL has no plan/requirement ID; WP-2026-088 must not be guessed as inspectionPlanId. Preserve source context; resolve a trusted plan/material requirement then select it, otherwise show authorized material requirements."
+  },
+  {
+    "id": "M0-ROUTE-005",
+    "source": "/branch-issues",
+    "target": "/inspections/branch-ledger?issueId=:issueId",
+    "gap": false,
+    "parameters": "Preserve issueId as issue ID; match against authorized RectificationRecord.sourceIssueId. It is not RectificationRecord.id (REC-*). Open only one authorized matching record; zero/multiple matches must show explicit not-found/selection, never submit against guessed ID."
+  },
+  {
+    "id": "M0-ROUTE-006",
+    "source": "/workspace/dashboard",
+    "target": "",
+    "gap": true,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-007",
+    "source": "/workspace/todo",
+    "target": "",
+    "gap": true,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-008",
+    "source": "/cases/list",
+    "target": "/cases?view=LIST",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-009",
+    "source": "/cases/kanban",
+    "target": "/cases?view=KANBAN",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-010",
+    "source": "/clues/list",
+    "target": "/cases/clues",
+    "gap": false,
+    "parameters": "No entity ID. Match this fixed alias before /clues/:id; never use literal list as clueId. Preserve permitted filters only; existing component selection still uses real clueId."
+  },
+  {
+    "id": "M0-ROUTE-011",
+    "source": "/finance/transactions",
+    "target": "",
+    "gap": true,
+    "parameters": "No caseId in seed. Retain provided caseId only as source context; validate it before any optional case-specific action."
+  },
+  {
+    "id": "M0-ROUTE-012",
+    "source": "/finance/budget",
+    "target": "",
+    "gap": true,
+    "parameters": "No legacy case/business-line key. Do not present the highest execution-rate reminder as budget management."
+  },
+  {
+    "id": "M0-ROUTE-013",
+    "source": "/finance/liabilities",
+    "target": "",
+    "gap": true,
+    "parameters": "No caseId in seed; aggregate provision KPI differs from case provision-history editing."
+  },
+  {
+    "id": "M0-ROUTE-014",
+    "source": "/finance/preservation",
+    "target": "",
+    "gap": true,
+    "parameters": "No caseId in seed; preservation records must be scoped to an authorized case."
+  },
+  {
+    "id": "M0-ROUTE-015",
+    "source": "/compliance/rules",
+    "target": "/cases/reports?domain=REGULATORY&tab=CALENDAR",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-016",
+    "source": "/compliance/alerts",
+    "target": "/cases/reports?domain=REGULATORY&tab=RISK_COCKPIT",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-017",
+    "source": "/compliance/reports",
+    "target": "/cases/reports?domain=REGULATORY&tab=WORKBENCH",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-018",
+    "source": "/counsels/firms",
+    "target": "/cases/vendors",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-019",
+    "source": "/counsels/lawyers",
+    "target": "",
+    "gap": true,
+    "parameters": "No firmId in seed. Existing LawyerPanel requires firmId. If a trusted firm context is later supplied, retain/validate firmId before opening its LAWYERS tab."
+  },
+  {
+    "id": "M0-ROUTE-020",
+    "source": "/counsels/contracts",
+    "target": "",
+    "gap": true,
+    "parameters": "No caseId/contractId in seed. Preserve as untrusted context if supplied, with explicit source-ID mapping before lookup."
+  },
+  {
+    "id": "M0-ROUTE-021",
+    "source": "/inbox/list",
+    "target": "/cases/inbox",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-022",
+    "source": "/system/users",
+    "target": "",
+    "gap": true,
+    "parameters": "No legacy userId. CE personnel mirror is not editable user account administration."
+  },
+  {
+    "id": "M0-ROUTE-023",
+    "source": "/system/roles",
+    "target": "/system/admin?tab=role",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-024",
+    "source": "/system/depts",
+    "target": "",
+    "gap": true,
+    "parameters": "No legacy deptId. Preserve organization/dept namespace through identity map; no synthetic organization selected."
+  },
+  {
+    "id": "M0-ROUTE-025",
+    "source": "/system/dicts",
+    "target": "/system/admin?tab=dict",
+    "gap": false,
+    "parameters": "No legacy parameters. Initialize dict tab; retain validated namespace/type/code after dictionary mapping. Unified dictionary must retain CE protected fields/version rules."
+  },
+  {
+    "id": "M0-ROUTE-026",
+    "source": "/system/menus",
+    "target": "/system/admin?tab=menu",
+    "gap": false,
+    "parameters": "No legacy parameters declared. Preserve validated query fields; injected view/tab from this alias is authoritative and is not overridden by an untrusted query."
+  },
+  {
+    "id": "M0-ROUTE-027",
+    "source": "/system/templates",
+    "target": "/system/admin?tab=process",
+    "gap": false,
+    "parameters": "System seed context supplies process_templates/task_templates; route to process/task templates. Document templates remain the separately reachable KnowledgeResources TEMPLATES view; do not merge their IDs or permissions."
+  }
+]

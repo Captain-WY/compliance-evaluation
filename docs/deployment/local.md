@@ -16,6 +16,7 @@ bootstrap 幂等生成 `deploy/local/.env`、`.local/casdoor-init.json` 和 `.lo
 | 前端 | http://localhost:3010 |
 | API / Swagger | http://localhost:8010/docs |
 | Casdoor | http://localhost:8000 |
+| MinIO S3（签名文件传输） | http://localhost:9000 |
 | MinIO 控制台 | http://localhost:9001 |
 
 首次配置遇端口占用会选用可用端口，实际以 `.local/dev-accounts.md` 及 `deploy/local/.env` 为准。本次交付 MinIO 控制台使用 9002。宿主端口仅绑定 `127.0.0.1`，数据库和 Redis 留在 Compose 内部网络。
@@ -24,15 +25,17 @@ bootstrap 幂等生成 `deploy/local/.env`、`.local/casdoor-init.json` 和 `.lo
 
 五种本地角色由初始化脚本生成。实际用户名和随机密码见本机 `.local/dev-accounts.md`；机器测试读取同目录 JSON，不将 token 或密码写入测试报告。
 
-| 角色 | 用途 |
-|---|---|
-| `platform_admin` | 系统管理、公共字典及业务管理验证 |
-| `hq_business` | 总部案件、检查和考核 |
-| `branch_business` | 分支机构业务及范围验证 |
-| `department_business` | 业务部门案件上报与协作 |
-| `external_lawyer` | 外聘律师参与案件及权限拒绝验证 |
+| 用户名 | 角色 | 用途 |
+|---|---|---|
+| `admin` | `platform_admin` | 系统管理、公共字典及业务管理验证 |
+| `hq_user` | `hq_business` | 总部案件、检查和考核 |
+| `branch_user` | `branch_business` | 分支机构业务及范围验证 |
+| `department_user` | `department_business` | 业务部门案件上报与协作 |
+| `lawyer` | `external_lawyer` | 外聘律师参与案件及权限拒绝验证 |
 
 访问前端登录页，用上述本地账号密码登录。后端向本地 Casdoor 获取真实 token，并校验签名、issuer、audience 和有效期；应用权限来自公共库。登出将当前 token 标记失效。
+
+Casdoor 运维账号为 `local_operator`，使用 `built-in` 组织，随机密码也在本机凭据文档中。默认演示管理员和公开演示签名密钥已移除，应用使用本次环境生成的签名证书。
 
 开发账号不是生产账号。部署文件仅服务本地开发，新环境不迁移原业务记录或附件。
 

@@ -1,0 +1,11 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {BrowserRouter} from 'react-router-dom';
+import {QueryClientProvider} from '@tanstack/react-query';
+import {Toaster} from 'sonner';
+import {queryClient} from './modules/cases/utils/queryClient';
+import {AuthProvider} from './platform/AuthProvider';
+import {ErrorBoundary} from './modules/cases/components/ErrorBoundary';
+import App from './app/App';
+import './index.css';
+createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><QueryClientProvider client={queryClient}><BrowserRouter><AuthProvider><App/><Toaster position="top-right" richColors/></AuthProvider></BrowserRouter></QueryClientProvider></ErrorBoundary></React.StrictMode>);

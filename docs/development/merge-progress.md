@@ -8,7 +8,7 @@
 |---|---|
 | 1 源复核和本地归档 | 完成；4,509个源文件零差异，仓库外归档逐文件校验通过 |
 | 2—4 后端/三库/认证字典 | merge_backend 执行，独占backend |
-| 5 前端统一 | merge_frontend 执行，独占frontend |
+| 5 前端统一 | 前端迁入完成；npm ci/build通过，32条历史类型诊断，待真实浏览器验收 |
 | 6 Docker部署/Casdoor | merge_deploy 执行，独占deploy及bootstrap/start/stop脚本 |
 | 7 基本回归 | 待统一接口和服务就绪，由主任务执行 |
 | 8 新规范和文档 | 主任务负责 |

@@ -4,7 +4,7 @@
 
 ## 本地启动
 
-需要 Docker Desktop（Linux containers）、PowerShell，以及首次构建时可访问镜像和软件包仓库的网络。
+需要 Docker Desktop（Linux containers）、PowerShell；基本测试脚本需要 Python 3.12+。首次构建需要可访问镜像和软件包仓库的网络。
 
 ```powershell
 git clone git@github.com:Captain-WY/compliance-evaluation.git
