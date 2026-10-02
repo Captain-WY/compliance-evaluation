@@ -6,7 +6,7 @@
 
 | 任务 | 状态 |
 |---|---|
-| 1 源复核和本地归档 | 进行中；M0的4,509个源文件零差异，远端仍为空 |
+| 1 源复核和本地归档 | 完成；4,509个源文件零差异，仓库外归档逐文件校验通过 |
 | 2—4 后端/三库/认证字典 | merge_backend 执行，独占backend |
 | 5 前端统一 | merge_frontend 执行，独占frontend |
 | 6 Docker部署/Casdoor | merge_deploy 执行，独占deploy及bootstrap/start/stop脚本 |
@@ -23,3 +23,6 @@
 - 原始source-manifest：4,509个文件零缺失/变化/额外。
 - 指定SSH密钥访问目标仓库成功；当前无远端refs。最终使用main正常push，核对SHA。
 - 旧测试失败按v2登记，不作为全部功能修复任务。
+
+- 源归档：`E:/weiyu/merge-archives/compliance-evaluation/2026-10-02/sources`（本机参考，不提交）。
+- 已处理案件成员和财务历史的三处跨业务/公共库 JOIN，改为公共库批量查询补全，待实际回归。
