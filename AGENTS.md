@@ -8,6 +8,7 @@
 - 一个API进程，案件case_business、合规compliance_business、公共platform_common各自独立database；Casdoor独立认证库。
 - 公共身份、权限、字典由公共层维护，不能以用户名猜测权限。跨库引用使用服务/ID映射，不设置跨库外键。
 - 第一层菜单固定为案件管理、合规检查、合规考核、系统管理；保留原业务页面及多角色边界。
+- 左侧统一导航在 `frontend/src/app/AppShell.tsx` 和 `navigation.ts`。合规页面自行控制间距和高度，案件页面保留各角色的内容容器；不要再次给所有模块套统一内边距。导航验收见 `docs/testing/navigation-regression.md`。
 - 新环境不迁移旧业务数据；保留适配后的基础种子，初始化须幂等。不要操作无关容器或删除未知数据卷。
 - 真实env、测试密码、私钥、历史档案和原型都不提交。必要运行YAML放backend/app/resources，应用不得依赖本机档案路径。
 - 重要工作保存检查点，记录执行过的命令和结果。原有非阻塞问题进入 docs/known-issues.md，不把历史失败当已通过。

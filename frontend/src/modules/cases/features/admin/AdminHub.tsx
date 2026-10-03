@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DictAdmin from './DictAdmin';
 import RoleAdmin from './RoleAdmin';
 import MenuAdmin from './MenuAdmin';
@@ -15,7 +16,14 @@ const TABS: { id: AdminTab; label: string; sub: string; icon: React.ElementType 
 ];
 
 const AdminHub: React.FC = () => {
-  const [tab, setTab] = useState<AdminTab>(() => {const tab=new URLSearchParams(window.location.search).get('tab');return ['dict','role','menu','process'].includes(tab||'') ? tab as AdminTab : 'dict';});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const tab: AdminTab = TABS.some(item => item.id === requestedTab) ? requestedTab as AdminTab : 'dict';
+  const setTab = (next: AdminTab) => setSearchParams(previous => {
+    const params = new URLSearchParams(previous);
+    params.set('tab', next);
+    return params;
+  });
 
   return (
     <div className="space-y-5">
