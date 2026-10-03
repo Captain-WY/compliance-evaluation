@@ -1,6 +1,6 @@
 # 合并执行检查点
 
-已按批准的 v2 范围执行：统一服务、Docker 启动、基本回归及 GitHub 交付，不做功能优化。
+本页保留已批准 v2 合并阶段的检查点：统一服务、Docker 启动、基本回归及 GitHub 交付。表中结果属于当时的验收范围；后续业务回归和导航改造另见下方记录。
 
 | 任务 | 状态 |
 |---|---|
@@ -17,4 +17,10 @@
 
 原源码及原 Git 历史、未提交改动、前端原型均在仓库外档案，不进入新项目。路径由本机 `.local/archive-index.json` 记录。部署凭据由 bootstrap 生成在忽略文件中。
 
-新项目已保存多个本地 Git 检查点，最终验证结果见 `docs/testing/smoke-report.md`。源归档、开发数据库、实际运行环境互相独立。
+新项目已保存多个本地 Git 检查点，合并阶段验证结果见 [基本回归](../testing/smoke-report.md)。源归档、开发数据库、实际运行环境互相独立。
+
+## 合并后的工作记录
+
+- [五角色业务回归](../testing/role-regression-report.md)：登记缺陷和能力缺口，未通过完整业务验收。
+- [左侧导航验收](../testing/navigation-regression.md)：恢复统一左侧导航及各模块内容容器，保留业务问题台账。
+- [归档复核与文档整合](reference-guide.md)：2026-10-03 重新验证 4,509 个快照文件和两个 Git bundle，吸收原项目适用约定，重写当前 README、AGENTS.md、CLAUDE.md 并补齐[开发指南](guide.md)和[文档索引](../README.md)。

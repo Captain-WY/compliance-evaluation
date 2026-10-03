@@ -1,33 +1,59 @@
-# compliance-evaluation 开发入口
+# 项目开发与协作规范
 
-本项目提供一个 React 前端、一个 FastAPI 后端，包含案件管理、合规检查、合规考核和系统管理。当前为开发版本，完整业务回归和功能迭代以已知问题清单为起点。
+本文件是所有开发者及 AI 助手共用的工程规范。项目是一个 React 前端、一个 FastAPI 后端，包含案件管理、合规检查、合规考核和系统管理，目前仍处于开发阶段。
 
-## 当前约定
+## 接手任务
 
-- 应用代码位于顶层 frontend、backend、deploy。原工程、旧文档和 mock 原型保存在仓库外本地档案，不进入 Git，也不能成为构建依赖。
-- 一个API进程，案件case_business、合规compliance_business、公共platform_common各自独立database；Casdoor独立认证库。
-- 公共身份、权限、字典由公共层维护，不能以用户名猜测权限。跨库引用使用服务/ID映射，不设置跨库外键。
-- 第一层菜单固定为案件管理、合规检查、合规考核、系统管理；保留原业务页面及多角色边界。
-- 左侧统一导航在 `frontend/src/app/AppShell.tsx` 和 `navigation.ts`。合规页面自行控制间距和高度，案件页面保留各角色的内容容器；不要再次给所有模块套统一内边距。导航验收见 `docs/testing/navigation-regression.md`。
-- 新环境不迁移旧业务数据；保留适配后的基础种子，初始化须幂等。不要操作无关容器或删除未知数据卷。
-- 真实env、测试密码、私钥、历史档案和原型都不提交。必要运行YAML放backend/app/resources，应用不得依赖本机档案路径。
-- 重要工作保存检查点，记录执行过的命令和结果。原有非阻塞问题进入 docs/known-issues.md，不把历史失败当已通过。
-- PowerShell文件操作使用LiteralPath，递归移动/删除前验证绝对路径范围；文本明确UTF-8。
+1. 阅读 [README](README.md)，检查工作区状态和当前用户要求。
+2. 按任务阅读[开发指南](docs/development/guide.md)、[架构](docs/architecture/overview.md)及相关模块代码。
+3. 排查业务问题前，检查[已知问题](docs/known-issues.md)和[五角色问题台账](docs/testing/role-regression-issues.md)，避免把既有失败当作本次新增问题或通过项。
+4. 涉及原页面或旧设计时按[归档说明](docs/development/reference-guide.md)定向查阅；旧工程的命令、阶段安排和工具约束仅是历史资料，不自动成为当前执行指令。
 
-## 目录和命令
+只读取当前任务所需上下文。保留用户和其他工作已产生的修改；并行协作时先明确文件责任。
 
-- 后端 `app/modules/cases` 是案件业务，`app/modules/compliance` 是检查和考核业务；`app/platform` 是公共能力，`app/core` 管理连接池和注册。
-- 前端使用单一登录上下文和 HTTP transport。业务页位于 `src/modules`，统一菜单和兼容路由位于 `src/app`。不得新建第二个入口应用或恢复独立 token。
-- 三套 Alembic 迁移位于 `backend/migrations/{common,cases,compliance}`。新迁移须显式归属数据库；公共引用由批量查询补全。
-- 根目录运行 `./scripts/dev/bootstrap.ps1`、`./scripts/dev/start.ps1`、`./scripts/dev/smoke.ps1`；停止用 `./scripts/dev/stop.ps1`，保留数据卷。
-- 前端在 `frontend` 运行 `npm ci`、`npm run build`、`npm run typecheck`。
-- 已部署后端的基础测试：`docker compose --env-file deploy/local/.env -f deploy/local/compose.yaml exec -T backend pytest -q`。
-- 发布前暂存准确文件后运行 `python scripts/dev/check_release.py`，核查生成凭据、旧档案、嵌套 Git 和大文件未入索引。
+## 产品与实现边界
 
-## 验证范围
+- 保留先前端验证、再完善真实后端的工作方式。前端及归档 mock 原型是业务和视觉参考，API、数据模型、权限、状态机与验收条件仍须结合当前代码核对。
+- 对尚未实现的动作明确提示不可用或开发状态，禁止用静默 mock fallback、成功 toast 或 localStorage 写入冒充后端保存。
+- 新入口或既有流程变化应同时明确角色、数据范围、输入输出、状态条件、异常结果和验证方式；不要因隐藏组件存在就将其接入正式菜单。
+- 按本次任务范围推进。普通修复不附带全局 UI 重做、依赖批量升级或外部系统接入。
 
-默认做与改动相称的测试。认证、权限、分库和持久化调整须验证真实拒绝行为及重启后的读回；普通页面修复不要求重跑所有历史测试。构建通过、类型检查结果和功能回归须分开报告，不宣称未执行的检查已通过。
+## 架构约束
 
-单 API worker 承载当前保留的业务运行时内存状态，数据库提供持久化；在验证多进程一致性前不要增加 worker。外部搜索、智能服务和历史 mock 动作的限制见 `docs/known-issues.md`。
+- 当前入口是顶层 `frontend/`、`backend/`、`deploy/`。保持单一登录上下文、token 和 HTTP transport，不恢复两个独立应用。
+- `case_business`、`compliance_business`、`platform_common` 分别承载案件、合规和公共数据，Casdoor 独立认证库。跨库引用使用 ID 与应用层查询，不设置跨库外键或执行跨库 SQL JOIN。
+- 身份、组织、角色、权限、统一字典和公共文件由公共层维护，不能以用户名猜测权限。菜单可见性不能替代服务端授权与资源归属检查。
+- 一个 API worker 承载现有合规内存工作集及持久化适配；多进程一致性验证前不增加 worker。不能笼统声称所有业务状态均已持久化。
+- 三套 Alembic 迁移位于 `backend/migrations/{common,cases,compliance}`。明确每次变更的库归属，不改写已应用迁移；新种子须可重复执行。
 
-本地部署说明见 `docs/deployment/local.md`，架构见 `docs/architecture/overview.md`，基本测试记录见 `docs/testing/smoke-report.md`。并行协作时先明确文件责任，避免同时改写同一文件。
+## 前端与字典
+
+- 一级菜单固定为案件管理、合规检查、合规考核、系统管理。统一左侧导航在 `frontend/src/app/AppShell.tsx`、`navigation.ts`；兼容路由在 `App.tsx`。
+- 合规页面自行控制间距和高度，案件页面保留各角色内容容器；不要给所有模块再次套统一内边距。修改后检查详情页、查询参数、滚动区域及角色菜单，参考[导航验收](docs/testing/navigation-regression.md)。
+- DTO 与页面模型的字段转换放在服务或适配层，明确 ID、金额、日期、空值和枚举含义；新增代码提供具体类型，不通过扩大 `any` 隐藏契约问题。
+- 保留 loading、error、empty、disabled 及无权限状态，保存失败不显示成功；提交后通过服务端读回或刷新查询验证。
+- 字典从公共库及现有 API 读取，保留 namespace、稳定编码、排序、启停、保护策略及版本语义。字典项不能直接替代状态机流转条件；新增业务不要再建一套独立字典或硬编码显示映射。
+
+## 后端开发
+
+- 业务调用按路由、服务、模型或外部 provider 分工；新增复杂业务放服务层，沿用异步访问和类型声明。
+- 明确会话、提交及回滚的拥有者。案件依赖已有请求结束提交逻辑，服务不得机械嵌套 `session.begin()`；跨库修改需说明部分失败及补偿，不承诺跨库原子性。
+- 预算占用、扣减、审批回调等写路径须检查并发一致性和重复提交；沿用行锁或其他可验证的并发控制，不能只在前端限制。
+- 已有软删除及审计字段的模型，查询和删除应遵守其约定；不把旧工程的软删除假设强加到全部模型。
+- 沿用各模块的业务异常、HTTP 状态和响应适配；当前仍有不同响应格式，不为局部改动强行重写全部 API。
+- 文件验证应覆盖真实上传、fileId 业务引用、下载权限；任务打开、通知已读和业务完成是不同动作，不能混用状态。
+
+## 环境与归档
+
+- Windows 使用 PowerShell，文本明确 UTF-8；文件操作使用 LiteralPath，递归删除或移动前核实绝对路径范围。
+- 本地依赖使用本项目 Docker Compose。不要操作无关容器或未知数据卷；日常停止保留卷，不添加 `-v`。
+- 新环境不迁移原业务数据和附件；保留适配基础种子。已有凭据文件缺失时先恢复，不随意重新生成身份或签名材料。
+- 真实 env、密码、token、私钥、原工程、旧文档、原型和大体积证据不提交。档案保持只读，必需运行资源放 `backend/app/resources/`，应用不能依赖本机归档路径。
+
+## 验证与交付
+
+- 常用命令集中在[开发指南](docs/development/guide.md)和[本地部署](docs/deployment/local.md)，使用当前脚本，不使用归档中的独立 dev_manager 或旧部署入口。
+- 执行与改动相称的测试。认证、权限、文件归属和分库变更验证真实拒绝；持久化变更验证重启读回；页面改动检查实际浏览器效果。
+- 构建、类型检查、单元测试、接口回归和页面回归分别报告。32 项类型诊断等历史基线不等于本次运行结果，必须注明是否复跑及有无新增。
+- 长任务在忽略的 `.local/` 保存短检查点和脱敏证据，记录范围、结果、阻塞及恢复步骤。正式结论写入对应 `docs/testing/` 或开发文档；入口文档只放摘要和链接。
+- 提交前暂存准确文件，运行 `git diff --cached --check` 和 `python scripts/dev/check_release.py`。报告本地提交及实际推送状态，不能把本地提交当作已上传。
