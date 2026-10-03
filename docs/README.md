@@ -8,12 +8,14 @@
 | --- | --- |
 | 了解项目和首次启动 | [项目 README](../README.md) |
 | 开发规范与 AI 接手 | [AGENTS.md](../AGENTS.md)、[CLAUDE.md](../CLAUDE.md) |
+| 需求、计划、验收与多会话协作 | [轻量迭代方法及新会话提示](development/iteration.md) |
+| 模块工作与交接 | [案件管理](modules/cases.md)、[合规检查](modules/inspections.md)、[系统管理](modules/system.md)；考核暂缓 |
 | 编码、联调、事务和字典规则 | [开发指南](development/guide.md) |
 | 服务边界和数据归属 | [架构说明](architecture/overview.md) |
 | Docker 部署、账号及日志 | [本地部署](deployment/local.md) |
 | 定位原设计或 mock 页面 | [归档与参考说明](development/reference-guide.md) |
 | 查看合并阶段检查点 | [合并执行记录](development/merge-progress.md) |
-| 选择修复任务 | [已知问题](known-issues.md)、[五角色问题台账](testing/role-regression-issues.md) |
+| 选择迭代任务 | [需求与问题总表](testing/role-regression-issues.md)、[已知限制](known-issues.md) |
 
 ## 验证记录
 
@@ -26,4 +28,4 @@
 
 ## 维护方式
 
-修改架构、启动方式或公共约定时，更新对应主文档及此索引。业务修复更新问题台账和专项验证记录。README、AGENTS.md 和 CLAUDE.md 不累积长篇执行日志；原项目归档保持只读。
+修改架构、启动方式或公共约定时，更新对应主文档及此索引。业务修复更新总表和模块交接；普通修复不要求另写专项报告。历史报告保留当时基线和结论，当前状态只查总表。README、AGENTS.md 和 CLAUDE.md 不累积执行日志；原项目归档保持只读。

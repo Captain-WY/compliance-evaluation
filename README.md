@@ -89,6 +89,8 @@ docs/                    当前架构、开发、部署、测试及问题记录
 
 原项目采用先完成 mock 前端、再补齐后端的方式。合并后继续以前端页面及归档原型作为业务和视觉参考，开发前先核对字段、API、权限和状态流转；真实保存必须由后端持久化并可重新读取。原型中的占位交互不等于已实现能力。
 
+后续按[轻量迭代方法](docs/development/iteration.md)推进：每批一个业务流程或 1～3 个相关问题，统一登记、按风险验证、简短交接。当前分别推进[案件管理](docs/modules/cases.md)、[合规检查](docs/modules/inspections.md)、[系统管理](docs/modules/system.md)，合规考核暂缓。各会话隔离代码工作区，共享 Docker 环境依次联调。
+
 本地前端开发建议使用与 Docker 构建一致的 Node.js 24，命令及后端事务约定见[开发指南](docs/development/guide.md)。AI 助手从 [AGENTS.md](AGENTS.md) 进入；[CLAUDE.md](CLAUDE.md) 复用同一套规范。
 
 | 验证记录 | 范围与结论 |
